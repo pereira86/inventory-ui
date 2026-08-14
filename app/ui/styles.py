@@ -11,8 +11,6 @@ def apply_mobile_styles() -> None:
         .muted {opacity:.7; font-size:.9rem;}
         .counter-emphasis-label {font-weight:700; font-size:1.05rem; margin:.45rem 0 .25rem 0;}
 
-        /* Keep the visual language neutral/gray even if Streamlit's theme
-           defaults change or config.toml is not picked up immediately. */
         [class*="st-key-counter_emphasis"] {
             border:1px solid rgba(49,51,63,.28);
             border-radius:12px;
@@ -20,7 +18,6 @@ def apply_mobile_styles() -> None:
             background:rgba(128,128,128,.06);
         }
 
-        /* Primary action buttons: neutral slate instead of Streamlit red. */
         button[kind="primary"],
         div[data-testid="stButton"] button[kind="primary"] {
             background:#6B7280 !important;
@@ -34,7 +31,6 @@ def apply_mobile_styles() -> None:
             color:#FFFFFF !important;
         }
 
-        /* Neutralize the red accent around focused controls. */
         div[data-baseweb="select"] > div:focus-within,
         div[data-testid="stTextInput"] > div > div:focus-within,
         div[data-testid="stNumberInput"] > div > div:focus-within,
@@ -66,29 +62,49 @@ def apply_mobile_styles() -> None:
         }
         [class*="st-key-sector_disabled_"] {opacity:.58;}
 
+        [class*="st-key-product_grid"] div[data-testid="stHorizontalBlock"] {
+            display:flex !important;
+            flex-direction:row !important;
+            flex-wrap:nowrap !important;
+            align-items:stretch !important;
+            gap:.45rem !important;
+        }
+        [class*="st-key-product_grid"] div[data-testid="stColumn"],
+        [class*="st-key-product_grid"] div[data-testid="column"] {
+            flex:1 1 0 !important;
+            width:calc(33.333% - .30rem) !important;
+            min-width:0 !important;
+        }
+        [class*="st-key-product_grid"] button {
+            width:100% !important;
+            min-height:4.1rem !important;
+            padding:.45rem .25rem !important;
+        }
 
-        /* Keep each recent-count shortcut on one horizontal line.
-           The keyed container is added in streamlit_app.py. */
         [class*="st-key-recent_row_"] div[data-testid="stHorizontalBlock"] {
+            display:flex !important;
+            flex-direction:row !important;
             flex-wrap:nowrap !important;
             align-items:center !important;
-            gap:.2rem !important;
+            gap:.15rem !important;
         }
+        [class*="st-key-recent_row_"] div[data-testid="stColumn"]:first-child,
         [class*="st-key-recent_row_"] div[data-testid="column"]:first-child {
             flex:1 1 auto !important;
             min-width:0 !important;
             width:auto !important;
         }
+        [class*="st-key-recent_row_"] div[data-testid="stColumn"]:last-child,
         [class*="st-key-recent_row_"] div[data-testid="column"]:last-child {
-            flex:0 0 2.3rem !important;
-            width:2.3rem !important;
-            min-width:2.3rem !important;
+            flex:0 0 2.2rem !important;
+            width:2.2rem !important;
+            min-width:2.2rem !important;
         }
         [class*="st-key-recent_row_"] button[kind="tertiary"] {
-            padding-top:.15rem !important;
-            padding-bottom:.15rem !important;
+            padding:.15rem .2rem !important;
             min-height:2rem !important;
         }
+        [class*="st-key-recent_row_"] div[data-testid="stColumn"]:first-child button[kind="tertiary"],
         [class*="st-key-recent_row_"] div[data-testid="column"]:first-child button[kind="tertiary"] {
             justify-content:flex-start !important;
             text-align:left !important;
