@@ -44,9 +44,9 @@ def _adjust_quantity(
         current_quantity + adjustment,
     )
 
-    st.session_state[quantity_key] = _format_quantity(
-        new_quantity
-    )
+    # st.number_input requires a numeric value in session_state.
+    # Never write the formatted display string back into this widget state.
+    st.session_state[quantity_key] = float(new_quantity)
 
     st.session_state.pop("pending", None)
 
@@ -705,70 +705,58 @@ def render_count_form(
                 )
 
             with st.container(
-                key="quantity_controls"
-            ):
-                minus_ten, minus_one = st.columns(2)
-
-                minus_ten.button(
+                key="quantity_controls",
+                horizontal=True,
+                horizontal_alignment="center",
+                vertical_alignment="center",
+                gap="xxsmall",
+            ) as controls:
+                controls.button(
                     "−10",
-                    use_container_width=True,
+                    width=64,
                     key=(
                         f"minus_10_"
                         f"{session['id']}_"
                         f"{item['product_id']}"
                     ),
                     on_click=_adjust_quantity,
-                    args=(
-                        quantity_key,
-                        -10.0,
-                    ),
+                    args=(quantity_key, -10.0),
                 )
 
-                minus_one.button(
+                controls.button(
                     "−1",
-                    use_container_width=True,
+                    width=64,
                     key=(
                         f"minus_1_"
                         f"{session['id']}_"
                         f"{item['product_id']}"
                     ),
                     on_click=_adjust_quantity,
-                    args=(
-                        quantity_key,
-                        -1.0,
-                    ),
+                    args=(quantity_key, -1.0),
                 )
 
-                plus_one, plus_ten = st.columns(2)
-
-                plus_one.button(
+                controls.button(
                     "+1",
-                    use_container_width=True,
+                    width=64,
                     key=(
                         f"plus_1_"
                         f"{session['id']}_"
                         f"{item['product_id']}"
                     ),
                     on_click=_adjust_quantity,
-                    args=(
-                        quantity_key,
-                        1.0,
-                    ),
+                    args=(quantity_key, 1.0),
                 )
 
-                plus_ten.button(
+                controls.button(
                     "+10",
-                    use_container_width=True,
+                    width=64,
                     key=(
                         f"plus_10_"
                         f"{session['id']}_"
                         f"{item['product_id']}"
                     ),
                     on_click=_adjust_quantity,
-                    args=(
-                        quantity_key,
-                        10.0,
-                    ),
+                    args=(quantity_key, 10.0),
                 )
 
     with st.container(
