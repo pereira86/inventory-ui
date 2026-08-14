@@ -30,7 +30,7 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
 
     preview_item=next((i for i in items if i['product_id']==preview_id),None)
     preview_text=(
-        f"Selecionado: {escape(preview_item['name'])} · toque novamente para abrir"
+        f"<strong>{escape(preview_item['name'])}</strong>"
         if preview_item else "&nbsp;"
     )
     st.markdown(
