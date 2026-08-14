@@ -37,19 +37,28 @@ def _sort_locations(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def list_employees(active_only: bool=True) -> list[dict[str,Any]]:
-    q='SELECT * FROM employees' + (' WHERE active=1' if active_only else '') + ' ORDER BY name'
-    with get_connection() as c: rows=c.execute(q).fetchall()
+    # Felipe (owner/supervisor) is a distinct user from Felipe Freitas.
+    # INSERT OR IGNORE keeps existing databases backward-compatible.
+    with get_connection() as c:
+        c.execute("INSERT OR IGNORE INTO employees(name,active) VALUES ('Felipe',1)")
+        c.execute("UPDATE employees SET active=1 WHERE name='Felipe'")
+        q='SELECT * FROM employees' + (' WHERE active=1' if active_only else '') + ' ORDER BY name'
+        rows=c.execute(q).fetchall()
     return [dict(r) for r in rows]
 
 
 GLOBAL_COUNT_ACCESS_NAMES={'daniel','felipe'}
 
 def employee_has_global_count_access(employee_id:int)->bool:
+    """Only the exact users Daniel and Felipe have universal count access.
+
+    Felipe Freitas and every other employee remain restricted to products
+    explicitly assigned to them.
+    """
     with get_connection() as c:
         row=c.execute('SELECT name FROM employees WHERE id=? AND active=1',(employee_id,)).fetchone()
     name=str(row['name'] or '').strip().casefold() if row else ''
-    first_name=name.split()[0] if name else ''
-    return first_name in GLOBAL_COUNT_ACCESS_NAMES
+    return name in GLOBAL_COUNT_ACCESS_NAMES
 
 
 def add_employee(name:str) -> int:
