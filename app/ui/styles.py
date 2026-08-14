@@ -148,12 +148,14 @@ def apply_mobile_styles() -> None:
             line-height:1.15;
             font-weight:700;
             margin:.15rem 0 1rem 0;
+            padding-top:1.35rem;
         }
 
         @media (max-width:430px) {
             .home-title {
                 font-size:1.72rem;
                 margin-bottom:.85rem;
+                padding-top:1.55rem;
             }
         }
 
