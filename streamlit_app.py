@@ -147,7 +147,7 @@ def _nav_back_home(back_to:int|None,key:str):
 
 
 def home():
-    st.title('📦 Minato Inventory')
+    st.markdown('<div class="home-title">📦 Minato Inventory</div>',unsafe_allow_html=True)
     st.caption('Contagem por setor e responsável.')
     _flash()
     employees=list_employees()

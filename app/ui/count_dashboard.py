@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections.abc import Callable
+from html import escape
 import streamlit as st
 
 STATUS_ICONS={'not_counted':'⬜','counted':'🟩','flagged':'🟧','confirmed_zero':'🟥'}
@@ -19,8 +20,24 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
     if total:
         st.progress(counted/total,text=f'{counted} de {total}')
 
-    # Compact 3-per-row product grid for mobile/tablet.
-    # Fixed button width avoids Streamlit stretching each product across the screen.
+    # Two-tap product selection for touch devices:
+    # first tap previews the product name, second tap opens it.
+    preview_id=st.session_state.get('preview_product_id')
+    current_ids={i['product_id'] for i in items}
+    if preview_id not in current_ids:
+        preview_id=None
+        st.session_state.pop('preview_product_id',None)
+
+    preview_item=next((i for i in items if i['product_id']==preview_id),None)
+    preview_text=(
+        f"Selecionado: {escape(preview_item['name'])} · toque novamente para abrir"
+        if preview_item else "&nbsp;"
+    )
+    st.markdown(
+        f'<div class="product-preview-slot">{preview_text}</div>',
+        unsafe_allow_html=True,
+    )
+
     cols_per_row=3
     for start in range(0,len(items),cols_per_row):
         row=st.container(
@@ -42,8 +59,12 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
                 help=item['name'],
                 width=76,
             ):
-                st.session_state.selected_product_id=item['product_id']
-                st.session_state.pop('pending',None)
+                if st.session_state.get('preview_product_id')==item['product_id']:
+                    st.session_state.selected_product_id=item['product_id']
+                    st.session_state.pop('preview_product_id',None)
+                    st.session_state.pop('pending',None)
+                else:
+                    st.session_state.preview_product_id=item['product_id']
                 st.rerun()
 
     m1,m2,m3,m4=st.columns(4)

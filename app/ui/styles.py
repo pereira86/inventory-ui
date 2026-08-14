@@ -141,6 +141,34 @@ def apply_mobile_styles() -> None:
                 font-size:.88rem !important;
             }
         }
+
+        /* Slightly smaller home title than Streamlit's default h1. */
+        .home-title {
+            font-size:2rem;
+            line-height:1.15;
+            font-weight:700;
+            margin:.15rem 0 1rem 0;
+        }
+
+        @media (max-width:430px) {
+            .home-title {
+                font-size:1.72rem;
+                margin-bottom:.85rem;
+            }
+        }
+
+        /* Fixed-height preview area for the two-tap product selection. */
+        .product-preview-slot {
+            min-height:1.45rem;
+            height:1.45rem;
+            margin:.05rem 0 .35rem 0;
+            color:rgba(49,51,63,.68);
+            font-size:.82rem;
+            line-height:1.35rem;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
         </style>
         """,
         unsafe_allow_html=True,
