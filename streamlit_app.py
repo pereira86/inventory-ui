@@ -101,23 +101,27 @@ def _recent_counts(limit:int=5):
         # Internal Streamlit navigation: no URL/query string and therefore no
         # browser tab/window is created. The tertiary button keeps the visual
         # treatment light, close to a text link.
-        c_link,c_close=st.columns([24,1],vertical_alignment='center')
-        if c_link.button(
-            label,
-            key=f"recent_open_{row['id']}",
-            type='tertiary',
-            use_container_width=True,
-        ):
-            _open_existing_session(int(row['id']))
+        # Keep the shortcut and dismiss control in one compact, tablet-safe
+        # row. CSS in app/ui/styles.py prevents these two columns from stacking.
+        with st.container(key=f"recent_row_{row['id']}"):
+            c_link,c_close=st.columns([12,1],vertical_alignment='center',gap='small')
+            if c_link.button(
+                label,
+                key=f"recent_open_{row['id']}",
+                type='tertiary',
+                use_container_width=True,
+            ):
+                _open_existing_session(int(row['id']))
 
-        if c_close.button(
-            '×',
-            key=f"recent_hide_{row['id']}",
-            type='tertiary',
-            help='Remover da página inicial',
-        ):
-            hide_session_from_dashboard(int(row['id']))
-            st.rerun()
+            if c_close.button(
+                '×',
+                key=f"recent_hide_{row['id']}",
+                type='tertiary',
+                help='Remover da página inicial',
+                use_container_width=True,
+            ):
+                hide_session_from_dashboard(int(row['id']))
+                st.rerun()
 
 
 def _nav_home_only(key:str):
