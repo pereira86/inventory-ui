@@ -65,6 +65,35 @@ def apply_mobile_styles() -> None:
             border-color:rgba(205,105,40,.34) !important;
         }
         [class*="st-key-sector_disabled_"] {opacity:.58;}
+
+
+        /* Keep each recent-count shortcut on one horizontal line.
+           The keyed container is added in streamlit_app.py. */
+        [class*="st-key-recent_row_"] div[data-testid="stHorizontalBlock"] {
+            flex-wrap:nowrap !important;
+            align-items:center !important;
+            gap:.2rem !important;
+        }
+        [class*="st-key-recent_row_"] div[data-testid="column"]:first-child {
+            flex:1 1 auto !important;
+            min-width:0 !important;
+            width:auto !important;
+        }
+        [class*="st-key-recent_row_"] div[data-testid="column"]:last-child {
+            flex:0 0 2.3rem !important;
+            width:2.3rem !important;
+            min-width:2.3rem !important;
+        }
+        [class*="st-key-recent_row_"] button[kind="tertiary"] {
+            padding-top:.15rem !important;
+            padding-bottom:.15rem !important;
+            min-height:2rem !important;
+        }
+        [class*="st-key-recent_row_"] div[data-testid="column"]:first-child button[kind="tertiary"] {
+            justify-content:flex-start !important;
+            text-align:left !important;
+            white-space:normal !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
