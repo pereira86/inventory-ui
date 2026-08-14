@@ -11,16 +11,23 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
     st.markdown(f"**{session['employee_name']}** · {session.get('location_code','')} {session.get('location_name','')} · **{counted}/{total}**")
     if total: st.progress(counted/total,text=f'{counted} de {total}')
 
-    # Three product tiles per row works much better on tablets and avoids
-    # Streamlit collapsing an 8-column grid into one oversized tile per row.
     cols_per_row=3
-    for start in range(0,len(items),cols_per_row):
-        cols=st.columns(cols_per_row,gap='small')
-        for col,item in zip(cols,items[start:start+cols_per_row]):
-            icon=STATUS_ICONS.get(item.get('status'),'⬜')
-            pos=item.get('count_order') or item['product_id']
-            if col.button(f"{icon}\n{int(pos):02d}" if str(pos).isdigit() else f"{icon}\n{pos}",key=f"pl_{item['product_id']}",help=item['name'],use_container_width=True):
-                st.session_state.selected_product_id=item['product_id']; st.session_state.pop('pending',None); st.rerun()
+    with st.container(key='product_grid'):
+        for start in range(0,len(items),cols_per_row):
+            cols=st.columns(cols_per_row,gap='small')
+            for col,item in zip(cols,items[start:start+cols_per_row]):
+                icon=STATUS_ICONS.get(item.get('status'),'⬜')
+                pos=item.get('count_order') or item['product_id']
+                if col.button(
+                    f"{icon}\n{int(pos):02d}" if str(pos).isdigit() else f"{icon}\n{pos}",
+                    key=f"pl_{item['product_id']}",
+                    help=item['name'],
+                    use_container_width=True
+                ):
+                    st.session_state.selected_product_id=item['product_id']
+                    st.session_state.pop('pending',None)
+                    st.rerun()
+
     m1,m2,m3,m4=st.columns(4)
     m1.metric('Contados',counted); m2.metric('Faltando',sum(i.get('status')=='not_counted' for i in items)); m3.metric('Flags',sum(i.get('status')=='flagged' for i in items)); m4.metric('Zero',sum(i.get('status')=='confirmed_zero' for i in items))
 
