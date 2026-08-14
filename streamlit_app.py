@@ -8,7 +8,7 @@ from app.ui.styles import apply_mobile_styles
 from app.ui.count_dashboard import render_count_dashboard
 from app.ui.count_form import render_count_form
 
-st.set_page_config(page_title='Minato Inventory',page_icon='📦',layout='centered')
+st.set_page_config(page_title='Minato Inventario',page_icon='📦',layout='centered')
 apply_mobile_styles(); init_db()
 
 DEFAULT_STATE={
@@ -144,7 +144,7 @@ def _nav_back_home(back_to:int|None,key:str):
 
 
 def home():
-    st.title('📦 Minato Inventory')
+    st.title('📦 Minato Inventario')
     st.caption('Contagem por setor e responsável.')
     _flash()
     employees=list_employees()
