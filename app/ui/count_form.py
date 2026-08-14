@@ -441,6 +441,17 @@ def render_count_form(
             font-variant-numeric: tabular-nums !important;
         }
 
+        /* Technical submit used only so Enter/Go on mobile saves.
+           The regular visible Salvar button remains in count_actions. */
+        [class*="st-key-enter_save_"] {
+            display:none !important;
+            height:0 !important;
+            min-height:0 !important;
+            margin:0 !important;
+            padding:0 !important;
+            overflow:hidden !important;
+        }
+
         /* Botões de ajuste abaixo do campo. */
         .st-key-quantity_controls {
             margin-top: 0.3rem !important;
@@ -729,15 +740,35 @@ def render_count_form(
                     unsafe_allow_html=True,
                 )
 
-                quantity_raw = st.number_input(
-                    f'Quantidade atual ({item["unit"]})',
-                    min_value=0.0,
-                    value=None,
-                    step=0.1,
-                    key=quantity_key,
-                    placeholder=quantity_placeholder,
-                    label_visibility="collapsed",
-                )
+                # A tiny form lets the mobile keyboard's Enter/Go/OK submit
+                # the quantity using Streamlit's native form behavior.
+                with st.form(
+                    key=(
+                        f"quantity_enter_form_"
+                        f"{session['id']}_"
+                        f"{item['product_id']}"
+                    ),
+                    clear_on_submit=False,
+                    enter_to_submit=True,
+                ):
+                    quantity_raw = st.number_input(
+                        f'Quantidade atual ({item["unit"]})',
+                        min_value=0.0,
+                        value=None,
+                        step=0.1,
+                        key=quantity_key,
+                        placeholder=quantity_placeholder,
+                        label_visibility="collapsed",
+                    )
+
+                    enter_save_clicked = st.form_submit_button(
+                        "Salvar",
+                        key=(
+                            f"enter_save_"
+                            f"{session['id']}_"
+                            f"{item['product_id']}"
+                        ),
+                    )
 
             controls = st.container(
                 key="quantity_controls",
@@ -839,6 +870,9 @@ def render_count_form(
                 f"{item['product_id']}"
             ),
         )
+
+    # Enter/Go/OK on the numeric keyboard is equivalent to tapping Salvar.
+    save_clicked = bool(save_clicked or enter_save_clicked)
 
     validation_error = None
 
