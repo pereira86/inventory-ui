@@ -2,13 +2,14 @@ from __future__ import annotations
 from datetime import datetime
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from app.database import init_db
 from app.services.inventory_service import *
 from app.ui.styles import apply_mobile_styles
 from app.ui.count_dashboard import render_count_dashboard
 from app.ui.count_form import render_count_form
 
-st.set_page_config(page_title='Minato Inventario',page_icon='📦',layout='centered')
+st.set_page_config(page_title='Minato Inventory',page_icon='📦',layout='centered')
 apply_mobile_styles(); init_db()
 
 DEFAULT_STATE={
@@ -98,31 +99,33 @@ def _recent_counts(limit:int=5):
             f"{row['counted']}/{row['total']} · início {row['started_at']}"
         )
 
-        # Internal Streamlit navigation: no URL/query string and therefore no
-        # browser tab/window is created. The tertiary button keeps the visual
-        # treatment light, close to a text link.
-        # Keep the shortcut and dismiss control in one compact, tablet-safe
-        # row. CSS in app/ui/styles.py prevents these two columns from stacking.
-        with st.container(key=f"recent_row_{row['id']}"):
-            c_link,c_close=st.columns([12,1],vertical_alignment='center',gap='small')
-            if c_link.button(
-                label,
-                key=f"recent_open_{row['id']}",
-                type='tertiary',
-                use_container_width=True,
-            ):
-                _open_existing_session(int(row['id']))
+        # Native horizontal container: unlike st.columns, this does not collapse
+        # into vertically stacked columns on mobile.
+        recent_row=st.container(
+            key=f"recent_row_{row['id']}",
+            horizontal=True,
+            horizontal_alignment='left',
+            vertical_alignment='center',
+            gap='xxsmall',
+        )
 
-            if c_close.button(
-                '×',
-                key=f"recent_hide_{row['id']}",
-                type='tertiary',
-                help='Remover da página inicial',
-                use_container_width=True,
-            ):
-                hide_session_from_dashboard(int(row['id']))
-                st.rerun()
+        if recent_row.button(
+            label,
+            key=f"recent_open_{row['id']}",
+            type='tertiary',
+            width='stretch',
+        ):
+            _open_existing_session(int(row['id']))
 
+        if recent_row.button(
+            '×',
+            key=f"recent_hide_{row['id']}",
+            type='tertiary',
+            help='Remover da página inicial',
+            width=34,
+        ):
+            hide_session_from_dashboard(int(row['id']))
+            st.rerun()
 
 def _nav_home_only(key:str):
     with st.container(key=f'nav_reference_{key}'):
@@ -144,7 +147,7 @@ def _nav_back_home(back_to:int|None,key:str):
 
 
 def home():
-    st.title('📦 Minato Inventario')
+    st.title('📦 Minato Inventory')
     st.caption('Contagem por setor e responsável.')
     _flash()
     employees=list_employees()
@@ -873,5 +876,45 @@ def admin():
     _nav_home_only('admin')
 
 
+
+
+def _scroll_to_top_on_view_change() -> None:
+    """Scroll only when the logical app view changes.
+
+    The view identity includes the page, hierarchy level and selected product.
+    Ordinary reruns caused by typing/selecting inside the same view do not move
+    the user's scroll position.
+    """
+    view_identity = (
+        st.session_state.get("page"),
+        st.session_state.get("count_nav_location_id"),
+        st.session_state.get("selected_product_id"),
+        bool(st.session_state.get("historical_direct_view")),
+    )
+
+    previous_identity = st.session_state.get("_last_view_identity")
+    st.session_state["_last_view_identity"] = view_identity
+
+    if previous_identity is None or previous_identity == view_identity:
+        return
+
+    components.html(
+        """
+        <script>
+        (function () {
+            try {
+                window.parent.scrollTo({top: 0, left: 0, behavior: "auto"});
+                window.parent.document.documentElement.scrollTop = 0;
+                window.parent.document.body.scrollTop = 0;
+            } catch (e) {}
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
 pages={'home':home,'count_setup':count_setup,'count':count_page,'review':review,'history':history,'admin':admin}
+_scroll_to_top_on_view_change()
 pages.get(st.session_state.page,home)()
