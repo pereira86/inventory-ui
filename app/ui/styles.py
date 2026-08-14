@@ -90,6 +90,23 @@ def apply_mobile_styles() -> None:
             opacity:.58;
         }
 
+        /* Taps navigate to a new logical screen; do not leave the old button
+           looking selected/faded while Streamlit reruns. */
+        [class*="st-key-sector_"] button:not(:disabled),
+        [class*="st-key-product_row_"] button:not(:disabled) {
+            opacity:1 !important;
+            transform:none !important;
+        }
+        [class*="st-key-sector_"] button:not(:disabled):focus,
+        [class*="st-key-sector_"] button:not(:disabled):active,
+        [class*="st-key-product_row_"] button:not(:disabled):focus,
+        [class*="st-key-product_row_"] button:not(:disabled):active {
+            opacity:1 !important;
+            filter:none !important;
+            transform:none !important;
+            box-shadow:none !important;
+        }
+
         /* Compact product buttons for iPhone/tablet. */
         [class*="st-key-product_row_"] {
             overflow-x:hidden !important;

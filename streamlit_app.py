@@ -878,24 +878,9 @@ def admin():
 
 
 
-def _scroll_to_top_on_view_change() -> None:
-    """Scroll only when the logical app view changes.
-
-    The view identity includes the page, hierarchy level and selected product.
-    Ordinary reruns caused by typing/selecting inside the same view do not move
-    the user's scroll position.
-    """
-    view_identity = (
-        st.session_state.get("page"),
-        st.session_state.get("count_nav_location_id"),
-        st.session_state.get("selected_product_id"),
-        bool(st.session_state.get("historical_direct_view")),
-    )
-
-    previous_identity = st.session_state.get("_last_view_identity")
-    st.session_state["_last_view_identity"] = view_identity
-
-    if previous_identity is None or previous_identity == view_identity:
+def _scroll_to_top_after_count() -> None:
+    """Scroll to top only after a count was actually saved/confirmed."""
+    if not st.session_state.pop("_scroll_to_top_once", False):
         return
 
     components.html(
@@ -916,5 +901,5 @@ def _scroll_to_top_on_view_change() -> None:
 
 
 pages={'home':home,'count_setup':count_setup,'count':count_page,'review':review,'history':history,'admin':admin}
-_scroll_to_top_on_view_change()
+_scroll_to_top_after_count()
 pages.get(st.session_state.page,home)()

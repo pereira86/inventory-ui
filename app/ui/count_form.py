@@ -199,6 +199,8 @@ def _advance_after_save(
 
     st.session_state.pop("pending", None)
     st.session_state.pop(quantity_key, None)
+    # Only successful/confirmed count actions request a scroll to the top.
+    st.session_state["_scroll_to_top_once"] = True
 
     if next_product_id is None:
         st.session_state.pop("selected_product_id", None)
@@ -500,9 +502,42 @@ def render_count_form(
         }
         /* A unidade é adicionada em uma regra dinâmica mais abaixo. */
 
-        /* Validação. */
+        /* Área de validação sempre reservada: evita que os controles pulem
+           quando um alerta aparece. */
         .st-key-count_validation {
-            margin-top: 0.6rem !important;
+            margin-top: 0.35rem !important;
+            min-height: 5.4rem !important;
+            height: 5.4rem !important;
+            overflow: hidden !important;
+        }
+
+        .st-key-count_validation .compact-count-alert {
+            box-sizing: border-box !important;
+            width: 100% !important;
+            min-height: 2.15rem !important;
+            max-height: 2.15rem !important;
+            overflow: hidden !important;
+            padding: 0.32rem 0.55rem !important;
+            border-radius: 8px !important;
+            background: rgba(230,180,45,.14) !important;
+            border: 1px solid rgba(190,145,25,.35) !important;
+            color: inherit !important;
+            font-size: 0.78rem !important;
+            line-height: 1.15 !important;
+        }
+
+        .st-key-count_validation .compact-count-previous {
+            margin: 0.15rem 0 0.2rem 0 !important;
+            color: #6b6b6b !important;
+            font-size: 0.70rem !important;
+            line-height: 1 !important;
+        }
+
+        .st-key-count_validation button {
+            min-height: 1.85rem !important;
+            height: 1.85rem !important;
+            padding: 0.1rem 0.35rem !important;
+            font-size: 0.78rem !important;
         }
 
         /* Botão voltar no final. */
@@ -805,6 +840,8 @@ def render_count_form(
             ),
         )
 
+    validation_error = None
+
     if zero_clicked:
         effective_session_id = _ensure_effective_session(session)
         save_count(
@@ -886,53 +923,63 @@ def render_count_form(
                 st.rerun()
 
         except ValueError as exc:
-            st.error(str(exc))
+            validation_error = str(exc)
 
     pending = st.session_state.get(
         "pending"
     )
 
-    if (
-        pending
-        and pending.get("product_id")
-        == item["product_id"]
-    ):
-        with st.container(
-            key="count_validation"
+    # Render this container on every product so its footprint never changes.
+    # The message itself is intentionally compact; when there is no warning,
+    # the reserved area stays empty and the controls below remain fixed.
+    with st.container(key="count_validation"):
+        if (
+            pending
+            and pending.get("product_id") == item["product_id"]
         ):
-            st.warning(
-                pending["message"]
+            safe_message = escape(str(pending.get("message") or "Verifique este valor."))
+            st.markdown(
+                f'<div class="compact-count-alert">{safe_message}</div>',
+                unsafe_allow_html=True,
             )
 
             if previous is not None:
-                st.caption(
-                    f"Contagem anterior: "
-                    f"{previous:g} {item['unit']}"
+                st.markdown(
+                    (
+                        '<div class="compact-count-previous">'
+                        f'Anterior: {previous:g} {escape(str(item["unit"]))}'
+                        '</div>'
+                    ),
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div class="compact-count-previous">&nbsp;</div>',
+                    unsafe_allow_html=True,
                 )
 
-            correct_column, confirm_column = (
-                st.columns(2)
+            decision_row = st.container(
+                horizontal=True,
+                horizontal_alignment="center",
+                vertical_alignment="center",
+                gap="xxsmall",
             )
 
-            if correct_column.button(
+            if decision_row.button(
                 "Corrigir",
-                use_container_width=True,
+                width=112,
                 key=(
                     f"correct_{session['id']}_"
                     f"{item['product_id']}"
                 ),
             ):
-                st.session_state.pop(
-                    "pending",
-                    None,
-                )
-
+                st.session_state.pop("pending", None)
                 st.rerun()
 
-            if confirm_column.button(
+            if decision_row.button(
                 "Confirmar",
                 type="primary",
-                use_container_width=True,
+                width=112,
                 key=(
                     f"confirm_{session['id']}_"
                     f"{item['product_id']}"
@@ -956,6 +1003,17 @@ def render_count_form(
                 )
 
                 st.rerun()
+
+        elif validation_error:
+            safe_error = escape(validation_error)
+            st.markdown(
+                f'<div class="compact-count-alert">{safe_error}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<div class="compact-count-previous">&nbsp;</div>',
+                unsafe_allow_html=True,
+            )
 
     with st.container(
         key="count_back"
