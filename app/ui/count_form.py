@@ -28,10 +28,14 @@ def _adjust_quantity(
     adjustment: float,
 ) -> None:
     """Altera a quantidade pelos botões rápidos."""
-    current_raw = st.session_state.get(quantity_key, "")
+    current_raw = st.session_state.get(quantity_key)
 
     try:
-        current_quantity = parse_quantity(current_raw)
+        current_quantity = (
+            float(current_raw)
+            if current_raw is not None
+            else 0.0
+        )
     except (ValueError, TypeError):
         current_quantity = 0.0
 
@@ -148,6 +152,60 @@ def _clear_product_state(
     )
 
 
+
+def _next_uncounted_product_id(
+    items: list[dict],
+    current_product_id: int,
+) -> int | None:
+    """Return the next uncounted product, wrapping once if needed."""
+    if not items:
+        return None
+
+    current_index = next(
+        (
+            index
+            for index, candidate in enumerate(items)
+            if candidate.get("product_id") == current_product_id
+        ),
+        -1,
+    )
+
+    ordered = (
+        items[current_index + 1:] + items[:current_index]
+        if current_index >= 0
+        else items
+    )
+
+    for candidate in ordered:
+        if (
+            candidate.get("product_id") != current_product_id
+            and candidate.get("status") == "not_counted"
+        ):
+            return int(candidate["product_id"])
+
+    return None
+
+
+def _advance_after_save(
+    items: list[dict],
+    current_product_id: int,
+    quantity_key: str,
+) -> None:
+    """Advance to the next uncounted product or return to the sector map."""
+    next_product_id = _next_uncounted_product_id(
+        items,
+        current_product_id,
+    )
+
+    st.session_state.pop("pending", None)
+    st.session_state.pop(quantity_key, None)
+
+    if next_product_id is None:
+        st.session_state.pop("selected_product_id", None)
+    else:
+        st.session_state.selected_product_id = next_product_id
+
+
 def _ensure_effective_session(session: dict) -> int:
     """Cria a sessão somente quando ocorre a primeira ação efetiva de contagem."""
     session_id = ensure_session_for_count(session)
@@ -246,7 +304,7 @@ def render_count_form(
         Seleciona o componente inteiro usando o aria-label
         real encontrado no HTML do Streamlit.
         */
-        div[data-testid="stTextInput"]:has(
+        div[data-testid="stNumberInput"]:has(
             input[aria-label^="Quantidade atual"]
         ) {
             width: 100% !important;
@@ -257,7 +315,7 @@ def render_count_form(
         Esconde o espaço do label dentro apenas do campo
         de quantidade.
         */
-        div[data-testid="stTextInput"]:has(
+        div[data-testid="stNumberInput"]:has(
             input[aria-label^="Quantidade atual"]
         )
         div[data-testid="stWidgetLabel"] {
@@ -265,10 +323,10 @@ def render_count_form(
         }
 
         /* Wrapper real encontrado no HTML desta versão do Streamlit. */
-        div[data-testid="stTextInput"]:has(
+        div[data-testid="stNumberInput"]:has(
             input[aria-label^="Quantidade atual"]
         )
-        div[data-testid="stTextInputRootElement"] {
+        div[data-testid="stNumberInput"] > div {
             width: 100% !important;
 
             height: 9rem !important;
@@ -345,10 +403,10 @@ def render_count_form(
             text-align: center !important;
         }
 
-        div[data-testid="stTextInput"]:has(
+        div[data-testid="stNumberInput"]:has(
             input[aria-label^="Quantidade atual"]:focus
         )
-        div[data-testid="stTextInputRootElement"] {
+        div[data-testid="stNumberInput"] > div {
             background: rgba(
                 220,
                 220,
@@ -364,6 +422,21 @@ def render_count_form(
             ) !important;
 
             box-shadow: none !important;
+        }
+
+
+        /* Quantity is a real numeric input so mobile opens the numeric keyboard.
+           Hide the widget's native +/- stepper because the form already has
+           dedicated -10/-1/+1/+10 controls below. */
+        .st-key-quantity_input_box button[aria-label*="Increment"],
+        .st-key-quantity_input_box button[aria-label*="Decrement"],
+        .st-key-quantity_input_box button[aria-label*="increase"],
+        .st-key-quantity_input_box button[aria-label*="decrease"] {
+            display: none !important;
+        }
+
+        .st-key-quantity_input_box input {
+            font-variant-numeric: tabular-nums !important;
         }
 
         /* Botões de ajuste abaixo do campo. */
@@ -457,10 +530,10 @@ def render_count_form(
                 font-size: 1.08rem;
             }
 
-            div[data-testid="stTextInput"]:has(
+            div[data-testid="stNumberInput"]:has(
                 input[aria-label^="Quantidade atual"]
             )
-            div[data-testid="stTextInputRootElement"],
+            div[data-testid="stNumberInput"] > div,
             input[aria-label^="Quantidade atual"] {
                 height: 8.3rem !important;
                 min-height: 8.3rem !important;
@@ -517,14 +590,11 @@ def render_count_form(
     )
 
     if quantity_key not in st.session_state:
-        if item["quantity"] is None:
-            st.session_state[quantity_key] = ""
-        else:
-            st.session_state[quantity_key] = (
-                _format_quantity(
-                    float(item["quantity"])
-                )
-            )
+        st.session_state[quantity_key] = (
+            None
+            if item["quantity"] is None
+            else float(item["quantity"])
+        )
 
     with st.container(
         key="product_quantity_row"
@@ -556,8 +626,8 @@ def render_count_form(
         with quantity_column:
             with st.container(key="quantity_input_box"):
                 unit_label = _display_unit(item["unit"])
-                has_quantity = bool(
-                    str(st.session_state.get(quantity_key, "")).strip()
+                has_quantity = (
+                    st.session_state.get(quantity_key) is not None
                 )
                 quantity_state_class = (
                     "has-quantity" if has_quantity else "is-empty"
@@ -624,8 +694,11 @@ def render_count_form(
                     unsafe_allow_html=True,
                 )
 
-                quantity_raw = st.text_input(
+                quantity_raw = st.number_input(
                     f'Quantidade atual ({item["unit"]})',
+                    min_value=0.0,
+                    value=None,
+                    step=0.1,
                     key=quantity_key,
                     placeholder=quantity_placeholder,
                     label_visibility="collapsed",
@@ -754,17 +827,21 @@ def render_count_form(
             notes,
         )
 
-        _clear_product_state(
-            quantity_key
+        _advance_after_save(
+            items,
+            item["product_id"],
+            quantity_key,
         )
 
         st.rerun()
 
     if save_clicked:
         try:
-            quantity = parse_quantity(
-                quantity_raw
-            )
+            if quantity_raw is None:
+                raise ValueError(
+                    "Informe uma quantidade ou use o botão Sem estoque."
+                )
+            quantity = float(quantity_raw)
 
             # Digitar 0 manualmente é equivalente ao botão "Sem estoque".
             if quantity == 0:
@@ -778,7 +855,11 @@ def render_count_form(
                     notes,
                 )
 
-                _clear_product_state(quantity_key)
+                _advance_after_save(
+                    items,
+                    item["product_id"],
+                    quantity_key,
+                )
                 st.rerun()
 
             validation = validate_count(
@@ -807,8 +888,10 @@ def render_count_form(
                     notes,
                 )
 
-                _clear_product_state(
-                    quantity_key
+                _advance_after_save(
+                    items,
+                    item["product_id"],
+                    quantity_key,
                 )
 
                 st.rerun()
@@ -877,8 +960,10 @@ def render_count_form(
                     pending["message"],
                 )
 
-                _clear_product_state(
-                    quantity_key
+                _advance_after_save(
+                    items,
+                    item["product_id"],
+                    quantity_key,
                 )
 
                 st.rerun()
