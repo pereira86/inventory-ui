@@ -11,7 +11,9 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
     st.markdown(f"**{session['employee_name']}** · {session.get('location_code','')} {session.get('location_name','')} · **{counted}/{total}**")
     if total: st.progress(counted/total,text=f'{counted} de {total}')
 
-    cols_per_row=8
+    # Three product tiles per row works much better on tablets and avoids
+    # Streamlit collapsing an 8-column grid into one oversized tile per row.
+    cols_per_row=3
     for start in range(0,len(items),cols_per_row):
         cols=st.columns(cols_per_row,gap='small')
         for col,item in zip(cols,items[start:start+cols_per_row]):
