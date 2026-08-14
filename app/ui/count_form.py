@@ -704,60 +704,61 @@ def render_count_form(
                     label_visibility="collapsed",
                 )
 
-            with st.container(
+            controls = st.container(
                 key="quantity_controls",
                 horizontal=True,
                 horizontal_alignment="center",
                 vertical_alignment="center",
                 gap="xxsmall",
-            ) as controls:
-                controls.button(
-                    "−10",
-                    width=64,
-                    key=(
-                        f"minus_10_"
-                        f"{session['id']}_"
-                        f"{item['product_id']}"
-                    ),
-                    on_click=_adjust_quantity,
-                    args=(quantity_key, -10.0),
-                )
+            )
 
-                controls.button(
-                    "−1",
-                    width=64,
-                    key=(
-                        f"minus_1_"
-                        f"{session['id']}_"
-                        f"{item['product_id']}"
-                    ),
-                    on_click=_adjust_quantity,
-                    args=(quantity_key, -1.0),
-                )
+            controls.button(
+                "−10",
+                width=64,
+                key=(
+                    f"minus_10_"
+                    f"{session['id']}_"
+                    f"{item['product_id']}"
+                ),
+                on_click=_adjust_quantity,
+                args=(quantity_key, -10.0),
+            )
 
-                controls.button(
-                    "+1",
-                    width=64,
-                    key=(
-                        f"plus_1_"
-                        f"{session['id']}_"
-                        f"{item['product_id']}"
-                    ),
-                    on_click=_adjust_quantity,
-                    args=(quantity_key, 1.0),
-                )
+            controls.button(
+                "−1",
+                width=64,
+                key=(
+                    f"minus_1_"
+                    f"{session['id']}_"
+                    f"{item['product_id']}"
+                ),
+                on_click=_adjust_quantity,
+                args=(quantity_key, -1.0),
+            )
 
-                controls.button(
-                    "+10",
-                    width=64,
-                    key=(
-                        f"plus_10_"
-                        f"{session['id']}_"
-                        f"{item['product_id']}"
-                    ),
-                    on_click=_adjust_quantity,
-                    args=(quantity_key, 10.0),
-                )
+            controls.button(
+                "+1",
+                width=64,
+                key=(
+                    f"plus_1_"
+                    f"{session['id']}_"
+                    f"{item['product_id']}"
+                ),
+                on_click=_adjust_quantity,
+                args=(quantity_key, 1.0),
+            )
+
+            controls.button(
+                "+10",
+                width=64,
+                key=(
+                    f"plus_10_"
+                    f"{session['id']}_"
+                    f"{item['product_id']}"
+                ),
+                on_click=_adjust_quantity,
+                args=(quantity_key, 10.0),
+            )
 
     with st.container(
         key="count_notes"
