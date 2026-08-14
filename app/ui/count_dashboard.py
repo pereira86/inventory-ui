@@ -26,7 +26,7 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
         row=st.container(
             key=f"product_row_{start//cols_per_row}",
             horizontal=True,
-            horizontal_alignment='left',
+            horizontal_alignment='center',
             vertical_alignment='center',
             gap='xxsmall',
         )
