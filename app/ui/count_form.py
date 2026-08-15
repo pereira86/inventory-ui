@@ -199,6 +199,19 @@ def _advance_after_save(
 
     st.session_state.pop("pending", None)
     st.session_state.pop(quantity_key, None)
+
+    # Clear transient control state before the next product is rendered.
+    for transient_key in (
+        "enter_save_current",
+        "minus_10_current",
+        "minus_1_current",
+        "plus_1_current",
+        "plus_10_current",
+        "zero_current_product",
+        "save_current_product",
+    ):
+        st.session_state.pop(transient_key, None)
+
     # Only successful/confirmed count actions request a scroll to the top.
     st.session_state["_scroll_to_top_once"] = True
 
@@ -441,9 +454,26 @@ def render_count_form(
             font-variant-numeric: tabular-nums !important;
         }
 
+        /* Keep the numeric field visually clean on mobile. */
+        .st-key-quantity_input_box [data-testid="InputInstructions"],
+        .st-key-quantity_input_box [data-testid="stInputInstructions"],
+        .st-key-quantity_input_box [class*="InputInstructions"] {
+            display:none !important;
+            height:0 !important;
+            min-height:0 !important;
+            margin:0 !important;
+            padding:0 !important;
+            overflow:hidden !important;
+        }
+
+        input[aria-label^="Quantidade atual"]:focus::placeholder {
+            color:transparent !important;
+            opacity:0 !important;
+        }
+
         /* Technical submit used only so Enter/Go on mobile saves.
            The regular visible Salvar button remains in count_actions. */
-        [class*="st-key-enter_save_"] {
+        [class*="st-key-enter_save_current"] {
             display:none !important;
             height:0 !important;
             min-height:0 !important;
@@ -743,11 +773,7 @@ def render_count_form(
                 # A tiny form lets the mobile keyboard's Enter/Go/OK submit
                 # the quantity using Streamlit's native form behavior.
                 with st.form(
-                    key=(
-                        f"quantity_enter_form_"
-                        f"{session['id']}_"
-                        f"{item['product_id']}"
-                    ),
+                    key="quantity_enter_form_current",
                     clear_on_submit=False,
                     enter_to_submit=True,
                 ):
@@ -756,6 +782,7 @@ def render_count_form(
                         min_value=0.0,
                         value=None,
                         step=0.1,
+                        format="%g",
                         key=quantity_key,
                         placeholder=quantity_placeholder,
                         label_visibility="collapsed",
@@ -763,11 +790,7 @@ def render_count_form(
 
                     enter_save_clicked = st.form_submit_button(
                         "Salvar",
-                        key=(
-                            f"enter_save_"
-                            f"{session['id']}_"
-                            f"{item['product_id']}"
-                        ),
+                        key="enter_save_current",
                     )
 
             controls = st.container(
@@ -781,11 +804,7 @@ def render_count_form(
             controls.button(
                 "−10",
                 width=64,
-                key=(
-                    f"minus_10_"
-                    f"{session['id']}_"
-                    f"{item['product_id']}"
-                ),
+                key="minus_10_current",
                 on_click=_adjust_quantity,
                 args=(quantity_key, -10.0),
             )
@@ -793,11 +812,7 @@ def render_count_form(
             controls.button(
                 "−1",
                 width=64,
-                key=(
-                    f"minus_1_"
-                    f"{session['id']}_"
-                    f"{item['product_id']}"
-                ),
+                key="minus_1_current",
                 on_click=_adjust_quantity,
                 args=(quantity_key, -1.0),
             )
@@ -805,11 +820,7 @@ def render_count_form(
             controls.button(
                 "+1",
                 width=64,
-                key=(
-                    f"plus_1_"
-                    f"{session['id']}_"
-                    f"{item['product_id']}"
-                ),
+                key="plus_1_current",
                 on_click=_adjust_quantity,
                 args=(quantity_key, 1.0),
             )
@@ -817,11 +828,7 @@ def render_count_form(
             controls.button(
                 "+10",
                 width=64,
-                key=(
-                    f"plus_10_"
-                    f"{session['id']}_"
-                    f"{item['product_id']}"
-                ),
+                key="plus_10_current",
                 on_click=_adjust_quantity,
                 args=(quantity_key, 10.0),
             )
@@ -855,20 +862,14 @@ def render_count_form(
         zero_clicked = zero_column.button(
             "Sem estoque",
             use_container_width=True,
-            key=(
-                f"zero_{session['id']}_"
-                f"{item['product_id']}"
-            ),
+            key="zero_current_product",
         )
 
         save_clicked = save_column.button(
             "Salvar",
             type="primary",
             use_container_width=True,
-            key=(
-                f"save_{session['id']}_"
-                f"{item['product_id']}"
-            ),
+            key="save_current_product",
         )
 
     # Enter/Go/OK on the numeric keyboard is equivalent to tapping Salvar.
