@@ -74,10 +74,17 @@ def _adjacent_sector_ids(
 
     return previous_id,next_id
 
-def _go_to_sector(location_id:int)->None:
+def _go_to_sector(location_id:int,nav_slot=None)->None:
     if st.session_state.get('_sector_nav_busy'):
         return
     st.session_state._sector_nav_busy=True
+
+    if nav_slot is not None:
+        try:
+            nav_slot.empty()
+        except Exception:
+            pass
+
     st.session_state.session_id=None
     st.session_state.selected_product_id=None
     st.session_state.count_nav_location_id=location_id
@@ -139,39 +146,45 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
         or session.get('location_id')
     )
     previous_sector_id,next_sector_id=_adjacent_sector_ids(session,current_sector_id)
-    sector_nav=st.container(
-        key='sector_sibling_nav',
-        horizontal=True,
-        horizontal_alignment='center',
-        vertical_alignment='center',
-        gap='xxsmall',
-    )
+    sector_nav_slot=st.empty()
+    with sector_nav_slot.container():
+        sector_nav=st.container(
+            key='sector_sibling_nav',
+            horizontal=True,
+            horizontal_alignment='center',
+            vertical_alignment='center',
+            gap='xxsmall',
+        )
 
-    if sector_nav.button(
-        '← Anterior',
-        width=88,
-        disabled=previous_sector_id is None,
-        key=f'previous_sector_{current_sector_id}',
-    ) and previous_sector_id is not None:
-        _go_to_sector(previous_sector_id)
+        previous_clicked=sector_nav.button(
+            '← Anterior',
+            width=88,
+            disabled=previous_sector_id is None,
+            key=f'previous_sector_{current_sector_id}',
+        )
 
-    sector_nav.markdown(
-        (
-            "<div style='min-width:92px;text-align:center;"
-            "font-size:.74rem;color:#666;line-height:1.9rem'>"
-            f"Local <strong style='color:#222;font-size:1.06rem'>"
-            f"{session.get('location_code','')}</strong></div>"
-        ),
-        unsafe_allow_html=True,
-    )
+        sector_nav.markdown(
+            (
+                "<div style='min-width:92px;text-align:center;"
+                "font-size:.74rem;color:#666;line-height:1.9rem'>"
+                f"Local <strong style='color:#222;font-size:1.06rem'>"
+                f"{session.get('location_code','')}</strong></div>"
+            ),
+            unsafe_allow_html=True,
+        )
 
-    if sector_nav.button(
-        'Próximo →',
-        width=88,
-        disabled=next_sector_id is None,
-        key=f'next_sector_{current_sector_id}',
-    ) and next_sector_id is not None:
-        _go_to_sector(next_sector_id)
+        next_clicked=sector_nav.button(
+            'Próximo →',
+            width=88,
+            disabled=next_sector_id is None,
+            key=f'next_sector_{current_sector_id}',
+        )
+
+    if previous_clicked and previous_sector_id is not None:
+        _go_to_sector(previous_sector_id,sector_nav_slot)
+
+    if next_clicked and next_sector_id is not None:
+        _go_to_sector(next_sector_id,sector_nav_slot)
 
     cols_per_row=3
     for start in range(0,len(items),cols_per_row):

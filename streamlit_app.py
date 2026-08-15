@@ -182,6 +182,40 @@ def home():
 
 
 def count_setup():
+    st.markdown(
+        """
+        <style>
+        .open-count-card {
+            margin:.18rem 0 .42rem 0;
+            padding:.48rem .62rem;
+            border-radius:9px;
+            background:rgba(70,120,190,.08);
+            border:1px solid rgba(70,120,190,.18);
+            text-align:center;
+        }
+        .open-count-title {
+            font-size:.76rem;
+            font-weight:700;
+            line-height:1;
+            color:#4f5966;
+            margin-bottom:.22rem;
+        }
+        .open-count-meta {
+            font-size:.72rem;
+            line-height:1.05rem;
+            color:#3f444a;
+        }
+        .open-count-start {
+            margin-top:.08rem;
+            font-size:.63rem;
+            line-height:.86rem;
+            color:#747b84;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     eid=st.session_state.selected_employee_id
     if not eid:
         go('home'); return
@@ -202,10 +236,21 @@ def count_setup():
         return
 
     latest=open_sessions[0]
-    st.info(
-        f"Existe uma contagem em andamento: {latest.get('location_code') or ''} · "
-        f"{latest.get('location_name') or ''} · {_count_type_label(latest.get('count_type') or '')} · "
-        f"início {latest.get('started_at') or '—'}"
+    st.markdown(
+        (
+            '<div class="open-count-card">'
+            '<div class="open-count-title">Contagem em andamento</div>'
+            '<div class="open-count-meta">'
+            f"<strong>{latest.get('location_code') or ''}</strong>"
+            f" · {latest.get('location_name') or ''}"
+            f" · {_count_type_label(latest.get('count_type') or '')}"
+            '</div>'
+            '<div class="open-count-start">'
+            f"Início: {latest.get('started_at') or '—'}"
+            '</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
     )
     if st.button('Continuar última contagem em aberto',type='primary',use_container_width=True):
         _open_existing_session(latest['id'])

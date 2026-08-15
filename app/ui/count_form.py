@@ -270,6 +270,66 @@ def _manual_product_navigation(
 
 
 
+def _install_quantity_keyboard_blur_listener() -> None:
+    """Attach a persistent submit/Enter listener to the live quantity field."""
+    components.html(
+        """
+        <script>
+        (function () {
+            const doc = window.parent.document;
+
+            function install() {
+                const input = doc.querySelector(
+                    'input[aria-label^="Quantidade atual"]'
+                );
+                if (!input) return;
+                if (input.dataset.minatoBlurBound === "1") return;
+
+                input.dataset.minatoBlurBound = "1";
+
+                const blur = () => {
+                    try {
+                        input.blur();
+                        if (doc.body) {
+                            doc.body.setAttribute("tabindex", "-1");
+                            if (typeof doc.body.focus === "function") {
+                                doc.body.focus({preventScroll:true});
+                            }
+                        }
+                    } catch (e) {}
+                };
+
+                input.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter") {
+                        setTimeout(blur, 0);
+                        setTimeout(blur, 60);
+                        setTimeout(blur, 180);
+                    }
+                }, true);
+
+                const form = input.closest("form");
+                if (form && form.dataset.minatoBlurBound !== "1") {
+                    form.dataset.minatoBlurBound = "1";
+                    form.addEventListener("submit", () => {
+                        setTimeout(blur, 0);
+                        setTimeout(blur, 60);
+                        setTimeout(blur, 180);
+                    }, true);
+                }
+            }
+
+            install();
+            setTimeout(install, 50);
+            setTimeout(install, 180);
+            setTimeout(install, 500);
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
 def _dismiss_mobile_keyboard() -> None:
     """Force the focused numeric field to release focus after Enter/Go."""
     components.html(
@@ -1211,6 +1271,8 @@ def render_count_form(
                     key="enter_save_current",
                 )
 
+        _install_quantity_keyboard_blur_listener()
+
         controls = st.container(
             key="quantity_controls",
             horizontal=True,
@@ -1289,12 +1351,10 @@ def render_count_form(
         )
 
     # Enter/Go/OK on the numeric keyboard is equivalent to tapping Salvar.
-    # Release focus first so the keyboard closes even when this value produces
-    # a warning and the user must choose Corrigir / Confirmar.
-    if enter_save_clicked:
-        _dismiss_mobile_keyboard()
-
     save_clicked = bool(save_clicked or enter_save_clicked)
+
+    if save_clicked:
+        _dismiss_mobile_keyboard()
 
     validation_error = None
 
