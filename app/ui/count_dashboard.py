@@ -30,7 +30,8 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
 
     preview_item=next((i for i in items if i['product_id']==preview_id),None)
     preview_text=(
-        f"<strong>{escape(preview_item['name'])}</strong>"
+        f"<strong>{escape(preview_item['name'])}</strong> "
+        f"<span style=\"font-weight:400;\">(clique novamente para selecionar)</span>"
         if preview_item else "&nbsp;"
     )
     st.markdown(
@@ -109,4 +110,4 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
             use_container_width=True,
             key=f"dash_home_{session.get('location_id','draft')}"
         ):
-            go('home')
+            go('home')')
