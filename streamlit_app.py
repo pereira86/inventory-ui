@@ -90,63 +90,159 @@ def _open_existing_session(session_id:int):
 
 def _recent_counts(limit:int=5):
     rows=list_sessions(limit,real_only=True,for_dashboard=True)
-    if not rows: return
-    st.divider(); st.subheader('Contagens recentes')
+    if not rows:
+        return
+
+    st.markdown(
+        """
+        <style>
+        /* Recent counts: stable responsive card, always two centered lines. */
+        [class*="st-key-recent_card_"] {
+            width:100% !important;
+            max-width:480px !important;
+            margin:.12rem auto !important;
+        }
+
+        [class*="st-key-recent_card_"] button {
+            width:100% !important;
+            min-width:0 !important;
+            height:3.15rem !important;
+            min-height:3.15rem !important;
+            padding:.28rem .55rem !important;
+            border:1px solid rgba(90,90,90,.18) !important;
+            border-radius:10px !important;
+            background:rgba(255,255,255,.35) !important;
+            box-shadow:none !important;
+            display:flex !important;
+            align-items:center !important;
+            justify-content:center !important;
+            text-align:center !important;
+            overflow:hidden !important;
+        }
+
+        [class*="st-key-recent_card_"] button:hover {
+            background:rgba(120,120,120,.05) !important;
+        }
+
+        [class*="st-key-recent_card_"] button p {
+            width:100% !important;
+            margin:0 !important;
+            font-size:.70rem !important;
+            line-height:1rem !important;
+            white-space:pre-line !important;
+            text-align:center !important;
+            overflow:hidden !important;
+        }
+
+        @media (max-width:480px) {
+            [class*="st-key-recent_card_"] {
+                max-width:none !important;
+            }
+
+            [class*="st-key-recent_card_"] button {
+                height:3.05rem !important;
+                min-height:3.05rem !important;
+                padding:.24rem .42rem !important;
+            }
+
+            [class*="st-key-recent_card_"] button p {
+                font-size:.66rem !important;
+                line-height:.94rem !important;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
+    st.subheader('Contagens recentes')
+
     for row in rows:
         status='Concluída' if row['status']=='completed' else 'Em andamento'
-        label=(
-            f"{row['employee_name']} · {_count_type_label(row['count_type'])} · {status} · "
-            f"{row['counted']}/{row['total']} · início {row['started_at']}"
+
+        started=str(row.get('started_at') or '—')
+        short_started=started
+        try:
+            parsed=datetime.strptime(started,'%Y-%m-%d %H:%M:%S')
+            short_started=parsed.strftime('%d/%m %H:%M')
+        except Exception:
+            pass
+
+        # Deliberately fixed at exactly two lines.
+        line1=(
+            f"{row['employee_name']} · "
+            f"{_count_type_label(row['count_type'])} · "
+            f"{status}"
         )
-
-        # Native horizontal container: unlike st.columns, this does not collapse
-        # into vertically stacked columns on mobile.
-        recent_row=st.container(
-            key=f"recent_row_{row['id']}",
-            horizontal=True,
-            horizontal_alignment='left',
-            vertical_alignment='center',
-            gap='xxsmall',
+        line2=(
+            f"{row['counted']}/{row['total']} · "
+            f"{short_started}"
         )
+        label=f"{line1}\n{line2}"
 
-        if recent_row.button(
-            label,
-            key=f"recent_open_{row['id']}",
-            type='tertiary',
-            width='stretch',
-        ):
-            _open_existing_session(int(row['id']))
+        with st.container(key=f"recent_card_{row['id']}"):
+            if st.button(
+                label,
+                key=f"recent_open_button_{row['id']}",
+                type='tertiary',
+                use_container_width=True,
+            ):
+                _open_existing_session(int(row['id']))
 
-        if recent_row.button(
-            '×',
-            key=f"recent_hide_{row['id']}",
-            type='tertiary',
-            help='Remover da página inicial',
-            width=34,
-        ):
-            hide_session_from_dashboard(int(row['id']))
-            st.rerun()
 
 def _nav_home_only(key:str):
-    with st.container(key=f'nav_reference_{key}'):
-        if st.button('Início',use_container_width=True,key=f'home_{key}'):
-            go('home')
+    nav_slot=st.empty()
+    with nav_slot.container():
+        with st.container(key=f'nav_reference_{key}'):
+            home_clicked=st.button('Início',use_container_width=True,key=f'home_{key}')
+
+    if home_clicked:
+        nav_slot.empty()
+        go('home')
 
 
 def _nav_back_home(back_to:int|None,key:str):
-    with st.container(key=f'nav_reference_{key}'):
-        c1,c2=st.columns(2)
-        if c1.button('← Voltar',use_container_width=True,key=f'back_{key}'):
-            st.session_state.count_nav_location_id=back_to
-            st.session_state.selected_product_id=None
-            st.session_state.session_id=None
-            st.session_state.pop('pending',None)
-            st.rerun()
-        if c2.button('Início',use_container_width=True,key=f'home_{key}'):
-            go('home')
+    nav_slot=st.empty()
+    with nav_slot.container():
+        with st.container(key=f'nav_reference_{key}'):
+            c1,c2=st.columns(2)
+            back_clicked=c1.button('← Voltar',use_container_width=True,key=f'back_{key}')
+            home_clicked=c2.button('Início',use_container_width=True,key=f'home_{key}')
+
+    if back_clicked:
+        nav_slot.empty()
+        st.session_state.count_nav_location_id=back_to
+        st.session_state.selected_product_id=None
+        st.session_state.session_id=None
+        st.session_state.pop('pending',None)
+        st.rerun()
+
+    if home_clicked:
+        nav_slot.empty()
+        go('home')
 
 
 def home():
+    st.markdown(
+        """
+        <style>
+        .counter-required-note {
+            margin:.16rem 0 .24rem 0;
+            padding:.30rem .44rem;
+            border-radius:8px;
+            background:rgba(230,180,45,.12);
+            border:1px solid rgba(190,145,25,.26);
+            color:#5b5240;
+            font-size:.66rem;
+            line-height:.88rem;
+            text-align:center;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.markdown('<div class="home-title">📦 Minato Inventory</div>',unsafe_allow_html=True)
     st.caption('Contagem por setor e responsável.')
     _flash()
@@ -162,7 +258,12 @@ def home():
         st.caption('Selecione o contador antes de iniciar. Essa escolha define quais setores e produtos serão exibidos.')
         if st.button('▶️ Contagem',type='primary',use_container_width=True):
             if selected_counter is None:
-                st.warning('É preciso selecionar um contador para entrar nas contagens.')
+                st.markdown(
+                    '<div class="counter-required-note">'
+                    'Selecione quem está contando para entrar nas contagens.'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
             else:
                 _reset_count_navigation()
                 st.session_state.selected_employee_id=selected_counter
@@ -221,7 +322,7 @@ def count_setup():
         go('home'); return
     employee=next((e for e in list_employees() if e['id']==eid),None)
     open_sessions=list_active_sessions(eid)
-    st.header('Contagem')
+    st.markdown('<div class="home-title">Contagem</div>',unsafe_allow_html=True)
     st.caption(f"Contador: {employee['name'] if employee else ''}")
     if not open_sessions:
         st.info('Não há contagem em andamento para este contador.')
@@ -311,10 +412,16 @@ def _render_sector_level(employee_id:int, current_id:int|None):
 
     employee=next((e for e in list_employees() if e['id']==employee_id),None)
     if current:
-        st.header(f"{current['code']} · {current['name']}")
+        st.markdown(
+            f'<div class="home-title">{current["code"]} · {current["name"]}</div>',
+            unsafe_allow_html=True,
+        )
         st.caption(f"Contador: {employee['name'] if employee else ''} · {_count_type_label(st.session_state.selected_count_type)}")
     else:
-        st.header(f"Setores · {employee['name'] if employee else ''}")
+        st.markdown(
+            f'<div class="home-title">Setores · {employee["name"] if employee else ""}</div>',
+            unsafe_allow_html=True,
+        )
         if historical_id:
             st.caption('Contagem histórica · selecione um setor para revisar ou editar os valores registrados.')
         else:
@@ -572,9 +679,15 @@ def review():
     review_location=get_location(review_location_id) if review_location_id else None
 
     if review_location:
-        st.header(f"Revisão · {review_location['code']} · {review_location['name']}")
+        st.markdown(
+            f'<div class="home-title">Revisão · {review_location["code"]} · {review_location["name"]}</div>',
+            unsafe_allow_html=True,
+        )
     else:
-        st.header(f"Revisão #{s['id']}")
+        st.markdown(
+            f'<div class="home-title">Revisão #{s["id"]}</div>',
+            unsafe_allow_html=True,
+        )
     df=pd.DataFrame([{'Produto':i['name'],'Setor':f"{i.get('location_code') or ''} {i.get('location_name') or ''}",'Quantidade':i['quantity'],'Unidade':i['unit'],'Status':i['status'],'Observação':i['notes'] or ''} for i in items])
     st.dataframe(df,use_container_width=True,hide_index=True)
     missing=[i for i in items if i['status']=='not_counted']
@@ -587,7 +700,7 @@ def review():
 
 
 def history():
-    st.header('Histórico')
+    st.markdown('<div class="home-title">Histórico</div>',unsafe_allow_html=True)
     _flash()
     rows=list_sessions(500,real_only=True)
     if not rows:
@@ -1010,7 +1123,7 @@ def _render_products_admin():
 
 
 def admin():
-    st.header('⚙️ Administração do estoque')
+    st.markdown('<div class="home-title">⚙️ Administração do estoque</div>',unsafe_allow_html=True)
     _flash()
     sections=['Estrutura operacional','Cadastro de produtos','Layout de setores']
     # Keep the operational catalog as the default working view. The old full

@@ -1546,35 +1546,43 @@ def render_count_form(
                     unsafe_allow_html=True,
                 )
 
-    count_back = st.container(
-        key="count_back",
-        horizontal=True,
-        horizontal_alignment="center",
-        vertical_alignment="center",
-        gap="xxsmall",
-    )
+    count_back_slot=st.empty()
+    with count_back_slot.container():
+        count_back = st.container(
+            key="count_back",
+            horizontal=True,
+            horizontal_alignment="center",
+            vertical_alignment="center",
+            gap="xxsmall",
+        )
 
-    if count_back.button(
-        "← Voltar",
-        width=132,
-        key=(
-            f"back_from_product_"
-            f"{session['id']}_"
-            f"{item['product_id']}"
-        ),
-    ):
+        back_clicked=count_back.button(
+            "← Voltar",
+            width=132,
+            key=(
+                f"back_from_product_"
+                f"{session['id']}_"
+                f"{item['product_id']}"
+            ),
+        )
+
+        home_clicked=count_back.button(
+            "Início",
+            width=132,
+            key=(
+                f"home_from_product_"
+                f"{session['id']}_"
+                f"{item['product_id']}"
+            ),
+        )
+
+    if back_clicked:
+        count_back_slot.empty()
         _clear_product_state(quantity_key)
         st.rerun()
 
-    if count_back.button(
-        "Início",
-        width=132,
-        key=(
-            f"home_from_product_"
-            f"{session['id']}_"
-            f"{item['product_id']}"
-        ),
-    ):
+    if home_clicked:
+        count_back_slot.empty()
         _clear_product_state(quantity_key)
         st.session_state.page="home"
         st.rerun()
