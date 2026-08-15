@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from html import escape
 import streamlit as st
+from app.services.inventory_service import get_location
 
 STATUS_ICONS={'not_counted':'⬜','counted':'🟩','flagged':'🟧','confirmed_zero':'🟥'}
 
@@ -95,13 +96,25 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
         ):
             st.session_state.session_id=None
             st.session_state.pop('selected_product_id',None)
-            current=st.session_state.get('count_nav_location_id')
+            current=(
+                st.session_state.get('count_nav_location_id')
+                or session.get('location_id')
+            )
 
             if st.session_state.get('historical_direct_view'):
+                # Leaving a "products directly in this sector" view should
+                # return to that same sector, not climb the hierarchy.
                 st.session_state.historical_direct_view=False
+                st.session_state.count_nav_location_id=current
             else:
-                parent_map=st.session_state.get('count_parent_map',{})
-                st.session_state.count_nav_location_id=parent_map.get(current)
+                # Resolve the real parent from the database at click time.
+                # This avoids stale/incomplete count_parent_map state sending
+                # Back directly to the hierarchy root.
+                current_location=get_location(current) if current is not None else None
+                st.session_state.count_nav_location_id=(
+                    current_location.get('parent_id')
+                    if current_location else None
+                )
 
             st.rerun()
 
