@@ -110,4 +110,4 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
             use_container_width=True,
             key=f"dash_home_{session.get('location_id','draft')}"
         ):
-            go('home')')
+            go('home')
