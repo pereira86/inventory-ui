@@ -61,38 +61,21 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
         gap='xxsmall',
     )
     if sector_nav.button(
-        '← Setor anterior',
+        '← Anterior',
         width=112,
         disabled=previous_sector_id is None,
         key=f'previous_sector_{current_sector_id}',
     ) and previous_sector_id is not None:
         _go_to_sector(previous_sector_id)
     if sector_nav.button(
-        'Próximo setor →',
+        'Próximo →',
         width=112,
         disabled=next_sector_id is None,
         key=f'next_sector_{current_sector_id}',
     ) and next_sector_id is not None:
         _go_to_sector(next_sector_id)
 
-    # Two-tap product selection for touch devices:
-    # first tap previews the product name, second tap opens it.
-    preview_id=st.session_state.get('preview_product_id')
-    current_ids={i['product_id'] for i in items}
-    if preview_id not in current_ids:
-        preview_id=None
-        st.session_state.pop('preview_product_id',None)
-
-    preview_item=next((i for i in items if i['product_id']==preview_id),None)
-    preview_text=(
-        f"<strong>{escape(preview_item['name'])}</strong> "
-        f"<span style=\"font-weight:400;\">(clique novamente para selecionar)</span>"
-        if preview_item else "&nbsp;"
-    )
-    st.markdown(
-        f'<div class="product-preview-slot">{preview_text}</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="product-preview-slot">&nbsp;</div>',unsafe_allow_html=True)
 
     cols_per_row=3
     for start in range(0,len(items),cols_per_row):
@@ -115,12 +98,9 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
                 help=item['name'],
                 width=76,
             ):
-                if st.session_state.get('preview_product_id')==item['product_id']:
-                    st.session_state.selected_product_id=item['product_id']
-                    st.session_state.pop('preview_product_id',None)
-                    st.session_state.pop('pending',None)
-                else:
-                    st.session_state.preview_product_id=item['product_id']
+                st.session_state.selected_product_id=item['product_id']
+                st.session_state.pop('preview_product_id',None)
+                st.session_state.pop('pending',None)
                 st.rerun()
 
     m1,m2,m3,m4=st.columns(4)

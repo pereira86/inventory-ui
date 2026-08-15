@@ -373,9 +373,9 @@ def render_count_form(
         div[data-testid="stNumberInput"] > div {
             width: 100% !important;
 
-            height: 9rem !important;
-            min-height: 9rem !important;
-            max-height: 9rem !important;
+            height: 7rem !important;
+            min-height: 7rem !important;
+            max-height: 7rem !important;
 
             display: flex !important;
             align-items: center !important;
@@ -408,9 +408,9 @@ def render_count_form(
         input[aria-label^="Quantidade atual"] {
             width: 100% !important;
 
-            height: 9rem !important;
-            min-height: 9rem !important;
-            max-height: 9rem !important;
+            height: 7rem !important;
+            min-height: 7rem !important;
+            max-height: 7rem !important;
 
             padding: 0 0.4rem !important;
             margin: 0 !important;
@@ -773,7 +773,7 @@ def render_count_form(
                 (
                     '<div class="count-product-header">'
                     '<div class="count-product-position">'
-                    f'Local: {formatted_position}'
+                    f'Local: <b>{formatted_position}</b>'
                     '</div>'
                     '<div class="count-product-name">'
                     f'{product_name}'
@@ -823,7 +823,7 @@ def render_count_form(
                     ) .react-aria-TextField::after {{
                         content: "{unit_label}" !important;
                         position: absolute !important;
-                        right: 2.35rem !important;
+                        right: 3.4rem !important;
                         top: 50% !important;
                         transform: translateY(-50%) !important;
                         z-index: 999999 !important;
