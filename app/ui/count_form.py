@@ -221,6 +221,35 @@ def _advance_after_save(
         st.session_state.selected_product_id = next_product_id
 
 
+
+def _adjacent_product_id(
+    items: list[dict],
+    current_product_id: int,
+    offset: int,
+) -> int | None:
+    """Return the previous/next product in the current sector, regardless of status."""
+    ids=[int(candidate["product_id"]) for candidate in items]
+    try:
+        index=ids.index(int(current_product_id))
+    except (ValueError,TypeError):
+        return None
+    target=index+offset
+    if target<0 or target>=len(ids):
+        return None
+    return ids[target]
+
+
+def _manual_product_navigation(
+    target_product_id: int,
+    quantity_key: str,
+) -> None:
+    """Navigate without saving and without triggering the save scroll behavior."""
+    st.session_state.pop("pending",None)
+    st.session_state.pop(quantity_key,None)
+    st.session_state.selected_product_id=target_product_id
+    st.rerun()
+
+
 def _ensure_effective_session(session: dict) -> int:
     """Cria a sessão somente quando ocorre a primeira ação efetiva de contagem."""
     session_id = ensure_session_for_count(session)
@@ -289,12 +318,12 @@ def render_count_form(
         }
 
         .count-product-position {
-            color: #777777;
-            font-size: 0.76rem;
-            font-weight: 500;
-            line-height: 1;
-
-            margin-bottom: 0.5rem;
+            color: #555555;
+            font-size: 1.02rem;
+            font-weight: 750;
+            line-height: 1.05;
+            letter-spacing: 0.01em;
+            margin-bottom: 0.55rem;
         }
 
         .count-product-name {
@@ -526,7 +555,8 @@ def render_count_form(
 
         /* Observação opcional. */
         .st-key-count_notes {
-            margin-top: 0.3rem !important;
+            margin-top: 0.08rem !important;
+            margin-bottom: 0.08rem !important;
         }
 
         .st-key-count_notes details {
@@ -536,7 +566,10 @@ def render_count_form(
 
         .st-key-count_notes details summary {
             color: #666666 !important;
-            font-size: 0.82rem !important;
+            font-size: 0.76rem !important;
+            line-height: 1.05rem !important;
+            padding-top: 0.08rem !important;
+            padding-bottom: 0.08rem !important;
         }
 
         /* Botões salvar e sem estoque. */
@@ -586,6 +619,28 @@ def render_count_form(
             height: 1.85rem !important;
             padding: 0.1rem 0.35rem !important;
             font-size: 0.78rem !important;
+        }
+
+        /* Confirming an outlier is intentionally more visible than Corrigir. */
+        [class*="st-key-confirm_"] button {
+            background:#5F8F6B !important;
+            border-color:#5F8F6B !important;
+            color:#FFFFFF !important;
+        }
+        [class*="st-key-confirm_"] button:hover {
+            background:#527D5D !important;
+            border-color:#527D5D !important;
+            color:#FFFFFF !important;
+        }
+
+        .st-key-product_manual_nav {
+            margin: 0 0 0.18rem 0 !important;
+        }
+        .st-key-product_manual_nav button {
+            min-height:1.9rem !important;
+            height:1.9rem !important;
+            padding:0.08rem 0.38rem !important;
+            font-size:0.76rem !important;
         }
 
         /* Botão voltar no final. */
@@ -679,6 +734,31 @@ def render_count_form(
             else float(item["quantity"])
         )
 
+    previous_product_id=_adjacent_product_id(items,item["product_id"],-1)
+    next_product_id=_adjacent_product_id(items,item["product_id"],1)
+
+    product_nav=st.container(
+        key="product_manual_nav",
+        horizontal=True,
+        horizontal_alignment="right",
+        vertical_alignment="center",
+        gap="xxsmall",
+    )
+    if product_nav.button(
+        "← Anterior",
+        width=86,
+        disabled=previous_product_id is None,
+        key="previous_product_current",
+    ) and previous_product_id is not None:
+        _manual_product_navigation(previous_product_id,quantity_key)
+    if product_nav.button(
+        "Próximo →",
+        width=86,
+        disabled=next_product_id is None,
+        key="next_product_current",
+    ) and next_product_id is not None:
+        _manual_product_navigation(next_product_id,quantity_key)
+
     with st.container(
         key="product_quantity_row"
     ):
@@ -693,7 +773,7 @@ def render_count_form(
                 (
                     '<div class="count-product-header">'
                     '<div class="count-product-position">'
-                    f'Local {formatted_position}'
+                    f'Local: {formatted_position}'
                     '</div>'
                     '<div class="count-product-name">'
                     f'{product_name}'
@@ -743,7 +823,7 @@ def render_count_form(
                     ) .react-aria-TextField::after {{
                         content: "{unit_label}" !important;
                         position: absolute !important;
-                        right: 0.9rem !important;
+                        right: 2.35rem !important;
                         top: 50% !important;
                         transform: translateY(-50%) !important;
                         z-index: 999999 !important;
@@ -770,7 +850,7 @@ def render_count_form(
                     .st-key-quantity_input_box
                     input[aria-label^="Quantidade atual"] {{
                         padding-left: 0.5rem !important;
-                        padding-right: 4.5rem !important;
+                        padding-right: 5.6rem !important;
                     }}
                     </style>
                     """,
@@ -798,6 +878,24 @@ def render_count_form(
                     enter_save_clicked = st.form_submit_button(
                         "Salvar",
                         key="enter_save_current",
+                    )
+
+            with st.container(key="count_notes"):
+                with st.expander(
+                    "＋ Adicionar observação",
+                    expanded=bool(item["notes"]),
+                ):
+                    notes = st.text_input(
+                        "Observação",
+                        value=item["notes"] or "",
+                        key=(
+                            f'notes_{session["id"]}_'
+                            f'{item["product_id"]}'
+                        ),
+                        placeholder=(
+                            "Ex.: caixa aberta ou embalagem danificada"
+                        ),
+                        label_visibility="collapsed",
                     )
 
             controls = st.container(
@@ -838,27 +936,6 @@ def render_count_form(
                 key="plus_10_current",
                 on_click=_adjust_quantity,
                 args=(quantity_key, 10.0),
-            )
-
-    with st.container(
-        key="count_notes"
-    ):
-        with st.expander(
-            "＋ Adicionar observação",
-            expanded=bool(item["notes"]),
-        ):
-            notes = st.text_input(
-                "Observação",
-                value=item["notes"] or "",
-                key=(
-                    f'notes_{session["id"]}_'
-                    f'{item["product_id"]}'
-                ),
-                placeholder=(
-                    "Ex.: caixa aberta ou "
-                    "embalagem danificada"
-                ),
-                label_visibility="collapsed",
             )
 
     # Render the two main actions through an explicit placeholder. Before
@@ -1072,22 +1149,8 @@ def render_count_form(
                     unsafe_allow_html=True,
                 )
 
-    with st.container(
-        key="count_back"
-    ):
-        back_col, home_col = st.columns(2)
-        if back_col.button(
-            "← Voltar",
-            use_container_width=True,
-            key=(
-                f"back_to_count_map_"
-                f"{session['id']}_"
-                f"{item['product_id']}"
-            ),
-        ):
-            _clear_product_state(quantity_key)
-            st.rerun()
-        if home_col.button(
+    with st.container(key="count_back"):
+        if st.button(
             "Início",
             use_container_width=True,
             key=(
@@ -1097,5 +1160,6 @@ def render_count_form(
             ),
         ):
             _clear_product_state(quantity_key)
-            st.session_state.page = "home"
+            st.session_state.page="home"
             st.rerun()
+

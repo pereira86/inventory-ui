@@ -2,9 +2,36 @@ from __future__ import annotations
 from collections.abc import Callable
 from html import escape
 import streamlit as st
-from app.services.inventory_service import get_location
+from app.services.inventory_service import get_location, list_child_locations
 
 STATUS_ICONS={'not_counted':'⬜','counted':'🟩','flagged':'🟧','confirmed_zero':'🟥'}
+
+
+def _adjacent_sector_ids(location_id:int|None)->tuple[int|None,int|None]:
+    if location_id is None:
+        return None,None
+    current=get_location(location_id)
+    if not current:
+        return None,None
+    siblings=list_child_locations(current.get('parent_id'),active_only=True)
+    ids=[int(row['id']) for row in siblings]
+    try:
+        index=ids.index(int(location_id))
+    except (ValueError,TypeError):
+        return None,None
+    previous_id=ids[index-1] if index>0 else None
+    next_id=ids[index+1] if index+1<len(ids) else None
+    return previous_id,next_id
+
+
+def _go_to_sector(location_id:int)->None:
+    st.session_state.session_id=None
+    st.session_state.selected_product_id=None
+    st.session_state.count_nav_location_id=location_id
+    st.session_state.historical_direct_view=False
+    st.session_state.pop('preview_product_id',None)
+    st.session_state.pop('pending',None)
+    st.rerun()
 
 
 def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None],**kwargs)->None:
@@ -20,6 +47,33 @@ def render_count_dashboard(session:dict,items:list[dict],go:Callable[[str],None]
 
     if total:
         st.progress(counted/total,text=f'{counted} de {total}')
+
+    current_sector_id=(
+        st.session_state.get('count_nav_location_id')
+        or session.get('location_id')
+    )
+    previous_sector_id,next_sector_id=_adjacent_sector_ids(current_sector_id)
+    sector_nav=st.container(
+        key='sector_sibling_nav',
+        horizontal=True,
+        horizontal_alignment='right',
+        vertical_alignment='center',
+        gap='xxsmall',
+    )
+    if sector_nav.button(
+        '← Setor anterior',
+        width=112,
+        disabled=previous_sector_id is None,
+        key=f'previous_sector_{current_sector_id}',
+    ) and previous_sector_id is not None:
+        _go_to_sector(previous_sector_id)
+    if sector_nav.button(
+        'Próximo setor →',
+        width=112,
+        disabled=next_sector_id is None,
+        key=f'next_sector_{current_sector_id}',
+    ) and next_sector_id is not None:
+        _go_to_sector(next_sector_id)
 
     # Two-tap product selection for touch devices:
     # first tap previews the product name, second tap opens it.
