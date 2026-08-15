@@ -3,11 +3,14 @@ from __future__ import annotations
 from html import escape
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 from app.services.inventory_service import (
     ensure_session_for_count,
     get_previous_quantity,
     save_count,
+    list_locations_for_employee,
+    list_count_items_for_location,
 )
 from app.validation.count_validation import (
     parse_quantity,
@@ -190,6 +193,8 @@ def _advance_after_save(
     items: list[dict],
     current_product_id: int,
     quantity_key: str,
+    employee_id: int | None = None,
+    current_location_id: int | None = None,
 ) -> None:
     """Advance to the next uncounted product or return to the sector map."""
     next_product_id = _next_uncounted_product_id(
@@ -215,10 +220,24 @@ def _advance_after_save(
     # Only successful/confirmed count actions request a scroll to the top.
     st.session_state["_scroll_to_top_once"] = True
 
-    if next_product_id is None:
-        st.session_state.pop("selected_product_id", None)
-    else:
+    if next_product_id is not None:
         st.session_state.selected_product_id = next_product_id
+        return
+
+    st.session_state.pop("selected_product_id", None)
+
+    # The current sector is finished. Continue through the whole hierarchy
+    # until finding the next sector that actually has products for this counter.
+    if employee_id is not None and current_location_id is not None:
+        next_location_id = _adjacent_countable_location_id(
+            employee_id,
+            current_location_id,
+            1,
+        )
+        if next_location_id is not None:
+            st.session_state.session_id = None
+            st.session_state.count_nav_location_id = next_location_id
+            st.session_state.pop("preview_product_id", None)
 
 
 
@@ -248,6 +267,92 @@ def _manual_product_navigation(
     st.session_state.pop(quantity_key,None)
     st.session_state.selected_product_id=target_product_id
     st.rerun()
+
+
+
+def _dismiss_mobile_keyboard() -> None:
+    """Force the focused numeric field to release focus after Enter/Go."""
+    components.html(
+        """
+        <script>
+        (function () {
+            function blurQuantity() {
+                try {
+                    const doc = window.parent.document;
+                    const active = doc.activeElement;
+                    if (active && typeof active.blur === "function") {
+                        active.blur();
+                    }
+
+                    const qty = doc.querySelector(
+                        'input[aria-label^="Quantidade atual"]'
+                    );
+                    if (qty && typeof qty.blur === "function") {
+                        qty.blur();
+                    }
+
+                    if (doc.body) {
+                        doc.body.setAttribute("tabindex", "-1");
+                        if (typeof doc.body.focus === "function") {
+                            doc.body.focus({preventScroll: true});
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            blurQuantity();
+            setTimeout(blurQuantity, 30);
+            setTimeout(blurQuantity, 120);
+            setTimeout(blurQuantity, 280);
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
+def _form_location_sort_key(row:dict):
+    code=str(row.get("code") or "")
+    key=[]
+    for part in code.split("."):
+        stripped=part.strip()
+        if stripped.isdigit():
+            key.append((0,int(stripped)))
+        else:
+            key.append((1,stripped.casefold()))
+    return tuple(key)
+
+
+def _adjacent_countable_location_id(
+    employee_id: int,
+    current_location_id: int | None,
+    offset: int,
+) -> int | None:
+    """Find the previous/next countable sector in full hierarchy order."""
+    if current_location_id is None:
+        return None
+
+    locations = list_locations_for_employee(employee_id)
+    locations = sorted(locations,key=_form_location_sort_key)
+    ordered_ids = [int(row["id"]) for row in locations]
+
+    try:
+        current_index = ordered_ids.index(int(current_location_id))
+    except (ValueError, TypeError):
+        return None
+
+    step = 1 if offset >= 0 else -1
+    index = current_index + step
+
+    while 0 <= index < len(ordered_ids):
+        candidate_id = ordered_ids[index]
+        if list_count_items_for_location(employee_id, candidate_id):
+            return candidate_id
+        index += step
+
+    return None
+
 
 
 def _ensure_effective_session(session: dict) -> int:
@@ -373,9 +478,9 @@ def render_count_form(
         div[data-testid="stNumberInput"] > div {
             width: 100% !important;
 
-            height: 7rem !important;
-            min-height: 7rem !important;
-            max-height: 7rem !important;
+            height: 9rem !important;
+            min-height: 9rem !important;
+            max-height: 9rem !important;
 
             display: flex !important;
             align-items: center !important;
@@ -408,9 +513,9 @@ def render_count_form(
         input[aria-label^="Quantidade atual"] {
             width: 100% !important;
 
-            height: 7rem !important;
-            min-height: 7rem !important;
-            max-height: 7rem !important;
+            height: 9rem !important;
+            min-height: 9rem !important;
+            max-height: 9rem !important;
 
             padding: 0 0.4rem !important;
             margin: 0 !important;
@@ -687,6 +792,248 @@ def render_count_form(
             }
 
         }
+
+        /* ===== FINAL COMPACT MOBILE COUNT SCREEN ===== */
+        .count-form-top-spacer {
+            height: 1.05rem !important;
+        }
+
+        .count-total-products {
+            margin: 0 0 .03rem 0 !important;
+            color: #777;
+            font-size: .64rem;
+            line-height: .72rem;
+            text-align: right;
+        }
+
+        .st-key-product_manual_nav {
+            margin: 0 0 .08rem 0 !important;
+        }
+
+        .st-key-product_manual_nav div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 4px !important;
+        }
+
+        .st-key-product_manual_nav button {
+            min-height: 1.85rem !important;
+            height: 1.85rem !important;
+            padding: .02rem .24rem !important;
+            font-size: .72rem !important;
+            white-space: nowrap !important;
+        }
+
+        .product-nav-location {
+            min-width: 82px;
+            text-align: center;
+            color: #666;
+            font-size: .72rem;
+            line-height: 1.85rem;
+            white-space: nowrap;
+        }
+
+        .product-nav-location strong {
+            color: #222;
+            font-size: 1.10rem;
+            font-weight: 800;
+        }
+
+        .st-key-product_quantity_row {
+            margin: 0 !important;
+        }
+
+        .count-product-header {
+            min-height: 0 !important;
+            display: block !important;
+            padding: .08rem 0 .14rem 0 !important;
+        }
+
+        .count-product-position {
+            display: none !important;
+        }
+
+        .count-product-name {
+            color: #262626 !important;
+            font-size: .98rem !important;
+            font-weight: 650 !important;
+            line-height: 1.04 !important;
+            margin: 0 !important;
+        }
+
+        .count-product-unit {
+            color: #777 !important;
+            font-size: .67rem !important;
+            line-height: .82rem !important;
+            margin-top: .09rem !important;
+        }
+
+        div[data-testid="stNumberInput"]:has(
+            input[aria-label^="Quantidade atual"]
+        ) {
+            margin: 0 !important;
+        }
+
+        div[data-testid="stNumberInput"]:has(
+            input[aria-label^="Quantidade atual"]
+        )
+        div[data-testid="stNumberInput"] > div,
+        input[aria-label^="Quantidade atual"] {
+            height: 3.45rem !important;
+            min-height: 3.45rem !important;
+            max-height: 3.45rem !important;
+        }
+
+        input[aria-label^="Quantidade atual"] {
+            font-size: 1.9rem !important;
+            padding-left: .35rem !important;
+            padding-right: 4.9rem !important;
+        }
+
+        input[aria-label^="Quantidade atual"]::placeholder {
+            font-size: .66rem !important;
+        }
+
+        .st-key-quantity_controls {
+            margin: .06rem 0 .02rem 0 !important;
+        }
+
+        .st-key-quantity_controls div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 4px !important;
+        }
+
+        .st-key-quantity_controls button {
+            min-height: 1.82rem !important;
+            height: 1.82rem !important;
+            padding: .01rem .12rem !important;
+            font-size: .70rem !important;
+        }
+
+        .st-key-count_notes {
+            margin: .01rem 0 !important;
+        }
+
+        .st-key-count_notes details {
+            padding: 0 !important;
+            border: 0 !important;
+        }
+
+        .st-key-count_notes details summary {
+            font-size: .66rem !important;
+            line-height: .78rem !important;
+            padding: .01rem 0 !important;
+        }
+
+        .st-key-count_notes div[data-testid="stTextInput"] {
+            margin-top: .02rem !important;
+        }
+
+        .st-key-count_actions {
+            margin: .05rem 0 0 0 !important;
+        }
+
+        .st-key-count_actions div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            gap: 4px !important;
+        }
+
+        .st-key-count_actions button {
+            min-height: 2rem !important;
+            height: 2rem !important;
+            padding: .02rem .16rem !important;
+            font-size: .72rem !important;
+            white-space: nowrap !important;
+        }
+
+        /* Keep a fixed warning footprint so Corrigir/Confirmar never pushes
+           the rest of the page down when a warning appears. */
+        .st-key-count_validation {
+            box-sizing: border-box !important;
+            margin: .05rem 0 .03rem 0 !important;
+            min-height: 3.35rem !important;
+            height: 3.35rem !important;
+            overflow: hidden !important;
+        }
+
+        .st-key-count_validation .compact-count-alert {
+            box-sizing: border-box !important;
+            width: 100% !important;
+            min-height: 1.22rem !important;
+            max-height: 1.22rem !important;
+            padding: .10rem .32rem !important;
+            border-radius: 7px !important;
+            font-size: .63rem !important;
+            line-height: 1rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+
+        .st-key-count_validation .compact-count-previous {
+            height: .62rem !important;
+            margin: .02rem 0 .03rem 0 !important;
+            font-size: .58rem !important;
+            line-height: .62rem !important;
+        }
+
+        .st-key-count_validation button {
+            min-height: 1.42rem !important;
+            height: 1.42rem !important;
+            padding: 0 .20rem !important;
+            font-size: .64rem !important;
+        }
+
+        /* Confirmar must visually beat the application's global gray primary
+           button rule. */
+        div[class*="st-key-confirm_"] div[data-testid="stButton"] > button,
+        div[class*="st-key-confirm_"] button[kind="primary"],
+        [class*="st-key-confirm_"] button {
+            background-color: #6F9E79 !important;
+            border-color: #6F9E79 !important;
+            color: #FFFFFF !important;
+        }
+
+        div[class*="st-key-confirm_"] div[data-testid="stButton"] > button:hover,
+        div[class*="st-key-confirm_"] button:hover,
+        [class*="st-key-confirm_"] button:hover {
+            background-color: #5F8C69 !important;
+            border-color: #5F8C69 !important;
+            color: #FFFFFF !important;
+        }
+
+        .st-key-count_back {
+            margin: .05rem 0 0 0 !important;
+            padding: 0 !important;
+            border-top: 0 !important;
+        }
+
+        .st-key-count_back {
+            width:100% !important;
+            overflow:hidden !important;
+        }
+
+        .st-key-count_back div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            justify-content:center !important;
+            gap: 4px !important;
+            width:100% !important;
+        }
+
+        .st-key-count_back button {
+            min-height: 1.78rem !important;
+            height: 1.78rem !important;
+            font-size: .66rem !important;
+            padding: .01rem .12rem !important;
+        }
+
+        @media (max-width: 640px) {
+            .count-form-top-spacer {
+                height: 1.15rem !important;
+            }
+        }
+
         </style>
 
         <div class="count-form-top-spacer"></div>
@@ -737,234 +1084,216 @@ def render_count_form(
     previous_product_id=_adjacent_product_id(items,item["product_id"],-1)
     next_product_id=_adjacent_product_id(items,item["product_id"],1)
 
+    st.markdown(
+        f'<div class="count-total-products">Produtos neste setor: <strong>{len(items)}</strong></div>',
+        unsafe_allow_html=True,
+    )
+
     product_nav=st.container(
         key="product_manual_nav",
         horizontal=True,
-        horizontal_alignment="right",
+        horizontal_alignment="center",
         vertical_alignment="center",
         gap="xxsmall",
     )
+
     if product_nav.button(
         "← Anterior",
-        width=86,
+        width=80,
         disabled=previous_product_id is None,
         key="previous_product_current",
     ) and previous_product_id is not None:
         _manual_product_navigation(previous_product_id,quantity_key)
+
+    product_nav.markdown(
+        (
+            '<div class="product-nav-location">'
+            f'Local <strong>{formatted_position}</strong>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
     if product_nav.button(
         "Próximo →",
-        width=86,
+        width=80,
         disabled=next_product_id is None,
         key="next_product_current",
     ) and next_product_id is not None:
         _manual_product_navigation(next_product_id,quantity_key)
 
-    with st.container(
-        key="product_quantity_row"
-    ):
-        product_column, quantity_column = st.columns(
-            [1.1, 1],
-            gap="small",
-            vertical_alignment="center",
+    with st.container(key="product_quantity_row"):
+        st.markdown(
+            (
+                '<div class="count-product-header">'
+                '<div class="count-product-name">'
+                f'{product_name}'
+                '</div>'
+                '<div class="count-product-unit">'
+                f'Contar em <b>{product_unit}</b>'
+                '</div>'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
         )
 
-        with product_column:
+        with st.container(key="quantity_input_box"):
+            unit_label = _display_unit(item["unit"])
+            has_quantity = st.session_state.get(quantity_key) is not None
+            quantity_state_class = "has-quantity" if has_quantity else "is-empty"
+
             st.markdown(
                 (
-                    '<div class="count-product-header">'
-                    '<div class="count-product-position">'
-                    f'Local: <b>{formatted_position}</b>'
-                    '</div>'
-                    '<div class="count-product-name">'
-                    f'{product_name}'
-                    '</div>'
-                    '<div class="count-product-unit">'
-                    f'Contar em <b>{product_unit}</b>'
-                    '</div>'
-                    '</div>'
+                    '<span class="quantity-state-marker '
+                    f'{quantity_state_class}"></span>'
                 ),
                 unsafe_allow_html=True,
             )
 
-        with quantity_column:
-            with st.container(key="quantity_input_box"):
-                unit_label = _display_unit(item["unit"])
-                has_quantity = (
-                    st.session_state.get(quantity_key) is not None
-                )
-                quantity_state_class = (
-                    "has-quantity" if has_quantity else "is-empty"
-                )
+            st.markdown(
+                f"""
+                <style>
+                .st-key-quantity_input_box .react-aria-TextField {{
+                    position: relative !important;
+                    width: 100% !important;
+                    overflow: visible !important;
+                }}
 
-                st.markdown(
-                    (
-                        '<span class="quantity-state-marker '
-                        f'{quantity_state_class}"></span>'
-                    ),
-                    unsafe_allow_html=True,
-                )
+                .st-key-quantity_input_box:has(.quantity-state-marker.has-quantity)
+                .react-aria-TextField::after {{
+                    content: "{unit_label}" !important;
+                    position: absolute !important;
+                    right: 3.25rem !important;
+                    top: 50% !important;
+                    transform: translateY(-50%) !important;
+                    z-index: 999999 !important;
+                    display: block !important;
+                    color: #555555 !important;
+                    background: transparent !important;
+                    border: 0 !important;
+                    padding: 0 !important;
+                    opacity: 1 !important;
+                    font-size: .80rem !important;
+                    font-weight: 500 !important;
+                    line-height: 1 !important;
+                    white-space: nowrap !important;
+                    pointer-events: none !important;
+                }}
 
-                st.markdown(
-                    f"""
-                    <style>
-                    /*
-                    Mantém o mesmo seletor que funcionou no diagnóstico.
-                    Só muda o visual e a visibilidade.
-                    */
-                    .st-key-quantity_input_box
-                    .react-aria-TextField {{
-                        position: relative !important;
-                        width: 100% !important;
-                        overflow: visible !important;
-                    }}
+                .st-key-quantity_input_box:has(.quantity-state-marker.is-empty)
+                .react-aria-TextField::after {{
+                    content: "" !important;
+                    display: none !important;
+                }}
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 
-                    .st-key-quantity_input_box:has(
-                        .quantity-state-marker.has-quantity
-                    ) .react-aria-TextField::after {{
-                        content: "{unit_label}" !important;
-                        position: absolute !important;
-                        right: 3.4rem !important;
-                        top: 50% !important;
-                        transform: translateY(-50%) !important;
-                        z-index: 999999 !important;
-                        display: block !important;
-                        color: #555555 !important;
-                        background: transparent !important;
-                        border: 0 !important;
-                        padding: 0 !important;
-                        opacity: 1 !important;
-                        font-size: 1rem !important;
-                        font-weight: 500 !important;
-                        line-height: 1 !important;
-                        white-space: nowrap !important;
-                        pointer-events: none !important;
-                    }}
-
-                    .st-key-quantity_input_box:has(
-                        .quantity-state-marker.is-empty
-                    ) .react-aria-TextField::after {{
-                        content: "" !important;
-                        display: none !important;
-                    }}
-
-                    .st-key-quantity_input_box
-                    input[aria-label^="Quantidade atual"] {{
-                        padding-left: 0.5rem !important;
-                        padding-right: 5.6rem !important;
-                    }}
-                    </style>
-                    """,
-                    unsafe_allow_html=True,
+            with st.form(
+                key="quantity_enter_form_current",
+                clear_on_submit=False,
+                enter_to_submit=True,
+            ):
+                quantity_raw = st.number_input(
+                    f'Quantidade atual ({item["unit"]})',
+                    min_value=0.0,
+                    value=None,
+                    step=0.1,
+                    format="%g",
+                    key=quantity_key,
+                    placeholder=quantity_placeholder,
+                    label_visibility="collapsed",
                 )
 
-                # A tiny form lets the mobile keyboard's Enter/Go/OK submit
-                # the quantity using Streamlit's native form behavior.
-                with st.form(
-                    key="quantity_enter_form_current",
-                    clear_on_submit=False,
-                    enter_to_submit=True,
-                ):
-                    quantity_raw = st.number_input(
-                        f'Quantidade atual ({item["unit"]})',
-                        min_value=0.0,
-                        value=None,
-                        step=0.1,
-                        format="%g",
-                        key=quantity_key,
-                        placeholder=quantity_placeholder,
-                        label_visibility="collapsed",
-                    )
+                enter_save_clicked = st.form_submit_button(
+                    "Salvar",
+                    key="enter_save_current",
+                )
 
-                    enter_save_clicked = st.form_submit_button(
-                        "Salvar",
-                        key="enter_save_current",
-                    )
+        controls = st.container(
+            key="quantity_controls",
+            horizontal=True,
+            horizontal_alignment="center",
+            vertical_alignment="center",
+            gap="xxsmall",
+        )
 
-            with st.container(key="count_notes"):
-                with st.expander(
-                    "＋ Adicionar observação",
-                    expanded=bool(item["notes"]),
-                ):
-                    notes = st.text_input(
-                        "Observação",
-                        value=item["notes"] or "",
-                        key=(
-                            f'notes_{session["id"]}_'
-                            f'{item["product_id"]}'
-                        ),
-                        placeholder=(
-                            "Ex.: caixa aberta ou embalagem danificada"
-                        ),
-                        label_visibility="collapsed",
-                    )
+        controls.button(
+            "−10",
+            width=64,
+            key="minus_10_current",
+            on_click=_adjust_quantity,
+            args=(quantity_key, -10.0),
+        )
+        controls.button(
+            "−1",
+            width=64,
+            key="minus_1_current",
+            on_click=_adjust_quantity,
+            args=(quantity_key, -1.0),
+        )
+        controls.button(
+            "+1",
+            width=64,
+            key="plus_1_current",
+            on_click=_adjust_quantity,
+            args=(quantity_key, 1.0),
+        )
+        controls.button(
+            "+10",
+            width=64,
+            key="plus_10_current",
+            on_click=_adjust_quantity,
+            args=(quantity_key, 10.0),
+        )
 
-            controls = st.container(
-                key="quantity_controls",
-                horizontal=True,
-                horizontal_alignment="center",
-                vertical_alignment="center",
-                gap="xxsmall",
-            )
-
-            controls.button(
-                "−10",
-                width=64,
-                key="minus_10_current",
-                on_click=_adjust_quantity,
-                args=(quantity_key, -10.0),
-            )
-
-            controls.button(
-                "−1",
-                width=64,
-                key="minus_1_current",
-                on_click=_adjust_quantity,
-                args=(quantity_key, -1.0),
-            )
-
-            controls.button(
-                "+1",
-                width=64,
-                key="plus_1_current",
-                on_click=_adjust_quantity,
-                args=(quantity_key, 1.0),
-            )
-
-            controls.button(
-                "+10",
-                width=64,
-                key="plus_10_current",
-                on_click=_adjust_quantity,
-                args=(quantity_key, 10.0),
-            )
-
-    # Render the two main actions through an explicit placeholder. Before
-    # advancing to another product we clear this placeholder first, preventing
-    # Streamlit Cloud from leaving the old buttons visible as translucent
-    # "stale" elements while the next product rerenders.
-    actions_slot = st.empty()
-    with actions_slot.container():
-        with st.container(key="count_actions"):
-            zero_column, save_column = st.columns(2)
-
-            zero_clicked = zero_column.button(
-                "Sem estoque",
-                use_container_width=True,
-                key="zero_current_product",
-            )
-
-            save_clicked = save_column.button(
-                "Salvar",
-                type="primary",
-                use_container_width=True,
-                key="save_current_product",
-            )
-
-    # Reserve the validation block through a placeholder as well so it can be
-    # cleared atomically with the actions during a product transition.
+    # Reserved validation slot. This height exists whether or not there is a warning.
     validation_slot = st.empty()
 
+    with st.container(key="count_notes"):
+        with st.expander(
+            "＋ Observação",
+            expanded=bool(item["notes"]),
+        ):
+            notes = st.text_input(
+                "Observação",
+                value=item["notes"] or "",
+                key=f'notes_{session["id"]}_{item["product_id"]}',
+                placeholder="Ex.: caixa aberta ou embalagem danificada",
+                label_visibility="collapsed",
+            )
+
+    # Main actions share one compact line.
+    actions_slot = st.empty()
+    with actions_slot.container():
+        actions = st.container(
+            key="count_actions",
+            horizontal=True,
+            horizontal_alignment="center",
+            vertical_alignment="center",
+            gap="xxsmall",
+        )
+
+        zero_clicked = actions.button(
+            "Sem estoque",
+            width=132,
+            key="zero_current_product",
+        )
+
+        save_clicked = actions.button(
+            "Salvar",
+            type="primary",
+            width=132,
+            key="save_current_product",
+        )
+
     # Enter/Go/OK on the numeric keyboard is equivalent to tapping Salvar.
+    # Release focus first so the keyboard closes even when this value produces
+    # a warning and the user must choose Corrigir / Confirmar.
+    if enter_save_clicked:
+        _dismiss_mobile_keyboard()
+
     save_clicked = bool(save_clicked or enter_save_clicked)
 
     validation_error = None
@@ -984,6 +1313,8 @@ def render_count_form(
             items,
             item["product_id"],
             quantity_key,
+            session["employee_id"],
+            session.get("location_id") or st.session_state.get("count_nav_location_id"),
         )
 
         actions_slot.empty()
@@ -1014,6 +1345,8 @@ def render_count_form(
                     items,
                     item["product_id"],
                     quantity_key,
+                    session["employee_id"],
+                    session.get("location_id") or st.session_state.get("count_nav_location_id"),
                 )
                 actions_slot.empty()
                 validation_slot.empty()
@@ -1049,6 +1382,8 @@ def render_count_form(
                     items,
                     item["product_id"],
                     quantity_key,
+                    session["employee_id"],
+                    session.get("location_id") or st.session_state.get("count_nav_location_id"),
                 )
 
                 actions_slot.empty()
@@ -1134,6 +1469,8 @@ def render_count_form(
                         items,
                         item["product_id"],
                         quantity_key,
+                        session["employee_id"],
+                        session.get("location_id") or st.session_state.get("count_nav_location_id"),
                     )
 
                     st.rerun()
@@ -1149,17 +1486,36 @@ def render_count_form(
                     unsafe_allow_html=True,
                 )
 
-    with st.container(key="count_back"):
-        if st.button(
-            "Início",
-            use_container_width=True,
-            key=(
-                f"home_from_product_"
-                f"{session['id']}_"
-                f"{item['product_id']}"
-            ),
-        ):
-            _clear_product_state(quantity_key)
-            st.session_state.page="home"
-            st.rerun()
+    count_back = st.container(
+        key="count_back",
+        horizontal=True,
+        horizontal_alignment="center",
+        vertical_alignment="center",
+        gap="xxsmall",
+    )
+
+    if count_back.button(
+        "← Voltar",
+        width=132,
+        key=(
+            f"back_from_product_"
+            f"{session['id']}_"
+            f"{item['product_id']}"
+        ),
+    ):
+        _clear_product_state(quantity_key)
+        st.rerun()
+
+    if count_back.button(
+        "Início",
+        width=132,
+        key=(
+            f"home_from_product_"
+            f"{session['id']}_"
+            f"{item['product_id']}"
+        ),
+    ):
+        _clear_product_state(quantity_key)
+        st.session_state.page="home"
+        st.rerun()
 

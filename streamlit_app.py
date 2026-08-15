@@ -315,6 +315,111 @@ def _render_sector_level(employee_id:int, current_id:int|None):
     return True
 
 
+
+def _count_location_sort_key(row:dict):
+    code=str(row.get("code") or "")
+    key=[]
+    for part in code.split("."):
+        stripped=part.strip()
+        if stripped.isdigit():
+            key.append((0,int(stripped)))
+        else:
+            key.append((1,stripped.casefold()))
+    return tuple(key)
+
+
+def _adjacent_countable_location_ids(
+    employee_id:int,
+    current_id:int|None,
+)->tuple[int|None,int|None]:
+    if current_id is None:
+        return None,None
+
+    rows=list_locations_for_employee(employee_id)
+    rows=sorted(rows,key=_count_location_sort_key)
+    ids=[int(row['id']) for row in rows]
+
+    try:
+        current_index=ids.index(int(current_id))
+    except (ValueError,TypeError):
+        return None,None
+
+    previous_id=None
+    index=current_index-1
+    while index>=0:
+        candidate_id=ids[index]
+        if list_count_items_for_location(employee_id,candidate_id):
+            previous_id=candidate_id
+            break
+        index-=1
+
+    next_id=None
+    index=current_index+1
+    while index<len(ids):
+        candidate_id=ids[index]
+        if list_count_items_for_location(employee_id,candidate_id):
+            next_id=candidate_id
+            break
+        index+=1
+
+    return previous_id,next_id
+
+
+def _render_empty_leaf_navigation(
+    employee_id:int,
+    current_id:int|None,
+):
+    previous_id,next_id=_adjacent_countable_location_ids(
+        employee_id,
+        current_id,
+    )
+
+    current=get_location(current_id) if current_id is not None else None
+
+    nav=st.container(
+        key=f'empty_leaf_nav_{current_id}',
+        horizontal=True,
+        horizontal_alignment='center',
+        vertical_alignment='center',
+        gap='xxsmall',
+    )
+
+    if nav.button(
+        '← Anterior',
+        width=88,
+        disabled=previous_id is None,
+        key=f'empty_previous_{current_id}',
+    ) and previous_id is not None:
+        st.session_state.session_id=None
+        st.session_state.selected_product_id=None
+        st.session_state.count_nav_location_id=previous_id
+        st.session_state.pop('pending',None)
+        st.rerun()
+
+    nav.markdown(
+        (
+            "<div style='min-width:92px;text-align:center;"
+            "font-size:.74rem;color:#666;line-height:1.9rem'>"
+            f"Local <strong style='color:#222;font-size:1.06rem'>"
+            f"{current.get('code','') if current else ''}</strong></div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if nav.button(
+        'Próximo →',
+        width=88,
+        disabled=next_id is None,
+        key=f'empty_next_{current_id}',
+    ) and next_id is not None:
+        st.session_state.session_id=None
+        st.session_state.selected_product_id=None
+        st.session_state.count_nav_location_id=next_id
+        st.session_state.pop('pending',None)
+        st.rerun()
+
+
+
 def count_page():
     eid=st.session_state.selected_employee_id
     if not eid:
@@ -373,13 +478,24 @@ def count_page():
         exclude_session_ids=st.session_state.get('count_excluded_session_ids',[]),
     )
     if active:
-        st.session_state.session_id=active['id']; st.rerun(); return
+        # Render the target sector immediately in this same rerun.
+        # Previously we set session_id and forced a second rerun, which caused
+        # the mobile UI to update in two stages (top first, content later).
+        st.session_state.session_id=active['id']
+        session=get_session(active['id'])
+        items=get_session_items(active['id'])
+        if st.session_state.get('selected_product_id'):
+            render_count_form(session,items)
+        else:
+            render_count_dashboard(session,items,go=go)
+        return
 
     loc=get_location(current_id)
     employee=next((e for e in list_employees() if e['id']==eid),None)
     items=list_count_items_for_location(eid,current_id)
     if not items:
         st.warning('Este setor folha não possui produtos atribuídos a este contador.')
+        _render_empty_leaf_navigation(eid,current_id)
         _nav_back_home(loc.get('parent_id') if loc else None,f'empty_leaf_{current_id}')
         return
 
